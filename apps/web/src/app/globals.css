@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #141414;
+  --ink: #0a0a0b;
+  --card: #f4f4f5;
+  --muted: #6e6e73;
+  --line: #e6e6e8;
+  --wing: #6242ff;
+  --wing-soft: #8b6bff;
+  --offer: #c8f56a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ink: var(--ink);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-wing: var(--wing);
+  --color-wing-soft: var(--wing-soft);
+  --color-offer: var(--offer);
+  --font-sans: var(--font-inter-tight), system-ui, sans-serif;
+  --radius-card: 1.5rem;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter-tight), system-ui, sans-serif;
+}
+
+.headline {
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+
+.wing-glow {
+  box-shadow: 0 0 80px rgba(98, 66, 255, 0.35);
+}
+
+.pixel-grid {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse at 20% 30%, black 20%, transparent 70%);
+}

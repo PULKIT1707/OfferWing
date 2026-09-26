@@ -17,12 +17,13 @@ import {
 } from "@/lib/agents/referral-scout";
 import type { JobMatch } from "@/lib/agents/job-match";
 import { requireUser } from "@/lib/auth";
-import { CONTACT_COLUMNS, sameCompany, type Contact } from "@/lib/dashboard";
+import { sameCompany } from "@/lib/dashboard";
 import { parseLinkedInExport } from "@/lib/linkedin-export";
 import { resolveCredential } from "@/lib/llm/credentials";
 import { UserFacingError } from "@/lib/llm/errors";
 import { generateStructured } from "@/lib/llm/generate";
 import { withDefaults } from "@/lib/onboarding";
+import { ensureContactForConnection } from "@/lib/referrals";
 
 const CHUNK = 500;
 
@@ -113,40 +114,11 @@ export async function searchConnections(query: string): Promise<Connection[]> {
   return (data ?? []) as Connection[];
 }
 
-// Adds (or reuses) a referral-list contact for this connection.
-async function ensureContact(supabase: Awaited<ReturnType<typeof requireUser>>["supabase"], userId: string, c: Connection, jobId: string | null): Promise<Contact | null> {
-  const { data: existing } = await supabase.from("contacts").select(CONTACT_COLUMNS).eq("connection_id", c.id).maybeSingle();
-  if (existing) {
-    if (jobId && !existing.job_id) {
-      const { data } = await supabase.from("contacts").update({ job_id: jobId }).eq("id", existing.id).select(CONTACT_COLUMNS).single();
-      return (data as Contact) ?? (existing as Contact);
-    }
-    return existing as Contact;
-  }
-  const { data } = await supabase
-    .from("contacts")
-    .insert({
-      user_id: userId,
-      connection_id: c.id,
-      full_name: c.full_name,
-      company: c.company,
-      title: c.position,
-      relationship: "connection",
-      strength: c.message_count > 20 ? 3 : c.message_count > 0 ? 2 : 1,
-      linkedin_url: c.profile_url,
-      referral_status: "to_ask",
-      job_id: jobId,
-    })
-    .select(CONTACT_COLUMNS)
-    .single();
-  return (data as Contact) ?? null;
-}
-
 export async function addConnectionToList(connectionId: string, jobId: string | null): Promise<{ error?: string }> {
   const { supabase, userId } = await requireUser();
   const { data: c } = await supabase.from("connections").select(CONNECTION_COLUMNS).eq("id", connectionId).maybeSingle();
   if (!c) return { error: "Connection not found." };
-  const contact = await ensureContact(supabase, userId, c as Connection, jobId);
+  const contact = await ensureContactForConnection(supabase, userId, c as Connection, jobId);
   if (!contact) return { error: "Couldn't add them to your list. Please try again." };
   revalidatePath("/dashboard", "layout");
   return {};
@@ -206,7 +178,7 @@ export async function draftReferralAsk(connectionId: string, jobId: string | nul
       schemaName: "referral_draft",
     });
     const draft = { ...result.data, short_version: result.data.short_version.slice(0, 300) };
-    const contact = await ensureContact(supabase, userId, connection, job?.id ?? null);
+    const contact = await ensureContactForConnection(supabase, userId, connection, job?.id ?? null);
     await supabase.from("outreach_drafts").insert({
       user_id: userId,
       connection_id: connection.id,

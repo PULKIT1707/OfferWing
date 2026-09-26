@@ -25,14 +25,20 @@ export async function POST(req: Request) {
   const url = canonicalJobUrl(parsed.data.url);
   if (!url) return jsonError("This doesn't look like a LinkedIn job posting.");
 
-  const { data: existing } = await supabase.from("jobs").select("id, description").eq("url", url).maybeSingle();
+  const { data: existing } = await supabase.from("jobs").select("id, description, stage").eq("url", url).maybeSingle();
   const fields = { title: parsed.data.title, company: parsed.data.company, location: parsed.data.location ?? null, url, source: "extension" as const };
   const description = parsed.data.description || null;
 
   const { data: job, error } = existing
     ? await supabase
         .from("jobs")
-        .update({ ...fields, ...(description && description !== existing.description ? { description, fit_score: null } : {}), updated_at: new Date().toISOString() })
+        .update({
+          ...fields,
+          ...(description && description !== existing.description ? { description, fit_score: null } : {}),
+          // Saving a job from the inbox moves it into the pipeline.
+          ...(existing.stage === "discovered" || existing.stage === "dismissed" ? { stage: "saved", stage_changed_at: new Date().toISOString() } : {}),
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", existing.id)
         .select("id, title, company, stage, fit_score")
         .single()

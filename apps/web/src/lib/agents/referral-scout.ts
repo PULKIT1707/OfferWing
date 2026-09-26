@@ -32,7 +32,7 @@ const stemRole = (w: string) => {
   for (let i = 0; i < 2 && out.length > 5; i++) out = out.replace(/(ers|er|ing|s)$/, "");
   return out;
 };
-const roleWords = (s: string) =>
+export const roleWords = (s: string) =>
   s
     .toLowerCase()
     .split(/[^a-z]+/)

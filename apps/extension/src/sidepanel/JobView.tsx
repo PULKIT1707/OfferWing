@@ -4,7 +4,7 @@ import type { Extracted } from "../lib/extract";
 import { FriendlyError } from "../lib/errors";
 import { People } from "./People";
 import type { Lookup, Me } from "./types";
-import { AppLink, Button, Card, Notice, scoreClass, Spinner } from "./ui";
+import { AppLink, Button, Card, CopyText, Notice, scoreClass, Spinner } from "./ui";
 
 const CHANNEL: Record<string, string> = {
   referral: "Ask for a referral first",
@@ -59,14 +59,19 @@ export function JobView({ me, page, lookup, refresh }: { me: Me; page: Extracted
         {!page.description && !job?.hasDescription && <Notice tone="warn">Couldn&apos;t read the job description. Open the full posting, then analyze again.</Notice>}
         {error && <Notice tone="error">{error}</Notice>}
         <div className="row">
-          {!job ? (
+          {!job || job.stage === "discovered" || job.stage === "dismissed" ? (
             <Button onClick={save} disabled={!!busy}>{busy ? <Spinner /> : null} Save &amp; score fit</Button>
           ) : !m && !scoring ? (
             <Button onClick={save} disabled={!!busy || !page.description}>Score fit</Button>
           ) : null}
           {job && <AppLink path={`/dashboard/jobs/${job.id}/kit`}>Application kit →</AppLink>}
         </div>
-        {job && <p className="muted small">Saved to your pipeline ({job.stage}).</p>}
+        {job && job.stage === "discovered" ? (
+          <p className="muted small">In your Offerwing inbox. Save it to move it into your pipeline.</p>
+        ) : job ? (
+          <p className="muted small">Saved to your pipeline ({job.stage}).</p>
+        ) : null}
+        {job && (job.stage === "screen" || job.stage === "interview") && <AppLink path={`/dashboard/interviews/${job.id}`}>Interview prep →</AppLink>}
       </Card>
 
       {(scoring || busy === "save") && (
@@ -93,6 +98,21 @@ export function JobView({ me, page, lookup, refresh }: { me: Me; page: Extracted
             </>
           )}
           {m.keywords_to_mirror.length > 0 && <div className="chips">{m.keywords_to_mirror.map((k) => <span key={k} className="chip">{k}</span>)}</div>}
+        </Card>
+      )}
+
+      {lookup.screeningAnswers.length > 0 && (
+        <Card title="Screening answers">
+          <p className="muted small">From your application kit. Copy each into the application yourself.</p>
+          {lookup.screeningAnswers.map((a) => (
+            <div key={a.question} className="answer">
+              <div className="answer-head">
+                <p className="label">{a.question}</p>
+                <CopyText text={a.answer} />
+              </div>
+              <p className="small">{a.answer}</p>
+            </div>
+          ))}
         </Card>
       )}
 

@@ -19,6 +19,7 @@ export type Lookup = {
   isExcluded: boolean;
   job: { id: string; title: string; company: string; stage: string; fit_score: number | null; hasDescription: boolean } | null;
   match: { status: "running" | "complete" | "failed"; result: JobMatch | null; error: string | null; created_at: string } | null;
+  screeningAnswers: { question: string; answer: string }[];
   connection: Person | null;
   people: Person[];
   jobsAtCompany: { id: string; title: string; stage: string; fit_score: number | null }[];

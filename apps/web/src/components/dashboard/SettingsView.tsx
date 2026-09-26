@@ -7,6 +7,7 @@ import { inputClass } from "@/components/onboarding/fields";
 import { AiStep, DocumentsStep } from "@/components/onboarding/steps-setup";
 import { CareerStep, LinkedinStep, PreferencesStep } from "@/components/onboarding/steps-profile";
 import type { AiSettings, CareerDocument, SearchProfile } from "@/lib/onboarding";
+import { JobSources, type InboundEmailRow, type JobSource } from "./JobSources";
 import { Button } from "./ui";
 
 function Section({ id, title, subtitle, saved, children }: { id: string; title: string; subtitle: string; saved?: boolean; children: ReactNode }) {
@@ -72,11 +73,17 @@ export function SettingsView({
   profile: initialProfile,
   ai: initialAi,
   documents: initialDocs,
+  alertAddress,
+  jobSources,
+  inboundEmails,
 }: {
   userId: string;
   profile: SearchProfile;
   ai: AiSettings;
   documents: CareerDocument[];
+  alertAddress: string;
+  jobSources: JobSource[];
+  inboundEmails: InboundEmailRow[];
 }) {
   const [profile, setProfile] = useState(initialProfile);
   const [ai, setAi] = useState(initialAi);
@@ -90,6 +97,7 @@ export function SettingsView({
   const nav = [
     ["#search", "Job search"],
     ["#linkedin", "LinkedIn"],
+    ["#sources", "Job sources"],
     ["#ai", "AI & keys"],
     ["#documents", "Documents"],
     ["#privacy", "Privacy"],
@@ -116,6 +124,9 @@ export function SettingsView({
         </Section>
         <Section id="linkedin" title="LinkedIn" subtitle="Your plan, target companies and writing samples." saved={saved === "linkedin"}>
           <LinkedinStep embedded profile={profile} onDone={onProfile("linkedin")} />
+        </Section>
+        <Section id="sources" title="Job sources" subtitle="Where new jobs come from. Everything lands in your pipeline inbox.">
+          <JobSources alertAddress={alertAddress} sources={jobSources} emails={inboundEmails} />
         </Section>
         <Section
           id="ai"

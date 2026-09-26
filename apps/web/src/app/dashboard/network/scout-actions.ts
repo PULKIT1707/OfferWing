@@ -124,7 +124,7 @@ export async function addConnectionToList(connectionId: string, jobId: string | 
   return {};
 }
 
-export async function draftReferralAsk(connectionId: string, jobId: string | null): Promise<{ draft?: ReferralDraft; contactId?: string; error?: string }> {
+export async function draftReferralAsk(connectionId: string, jobId: string | null): Promise<{ draft?: ReferralDraft; contactId?: string; draftId?: string; error?: string }> {
   const { supabase, userId } = await requireUser();
   const [{ data: conn }, { data: job }, { data: search }, { data: profile }, { data: lastImport }] = await Promise.all([
     supabase.from("connections").select(CONNECTION_COLUMNS).eq("id", connectionId).maybeSingle(),
@@ -179,7 +179,7 @@ export async function draftReferralAsk(connectionId: string, jobId: string | nul
     });
     const draft = { ...result.data, short_version: result.data.short_version.slice(0, 300) };
     const contact = await ensureContactForConnection(supabase, userId, connection, job?.id ?? null);
-    await supabase.from("outreach_drafts").insert({
+    const { data: draftRow } = await supabase.from("outreach_drafts").insert({
       user_id: userId,
       connection_id: connection.id,
       contact_id: contact?.id ?? null,
@@ -189,9 +189,9 @@ export async function draftReferralAsk(connectionId: string, jobId: string | nul
       provider: credential.provider,
       model: result.model,
       result: draft,
-    });
+    }).select("id").single();
     revalidatePath("/dashboard", "layout");
-    return { draft, contactId: contact?.id };
+    return { draft, contactId: contact?.id, draftId: draftRow?.id };
   } catch (err) {
     if (err instanceof UserFacingError) return { error: err.message };
     console.error("referral draft failed", err);

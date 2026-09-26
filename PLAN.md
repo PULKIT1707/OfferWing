@@ -607,3 +607,29 @@ Every widget shows its **source and "last synced" time**, so numbers are never m
 9. **Interviews & offers**: calendar, prep packs, mock-interview scores, offer comparison.
 10. **Insights**: funnel conversion by channel, what's working and what's not, weekly AI coach review.
 11. **Settings**: search profile, AI & keys (mode, provider, spend), integrations (extension, email forwarding, LinkedIn link), privacy (export or delete all data).
+
+---
+
+## 17. Build status (September 2026)
+
+Every agent in the plan and both surfaces (web app and Chrome extension) are built. All are tested up to the AI call; none has run against a real model yet.
+
+| Plan item | Built as |
+|---|---|
+| A0 Career Coach | Weekly plan on Today (`lib/agents/coach.ts`) |
+| A1 Knowledge base | Cached document text plus STAR story bank (`stories`) |
+| A2 Profile Optimizer | Profile health audit |
+| A3 Job Discovery | Inbox from forwarded alert emails and Greenhouse / Lever / Ashby boards, cron every 6 hours |
+| A4 Job Match | Fit scoring (server, or in the extension for Private mode) |
+| A5 Application Tailoring | Application kits with truthfulness check and `.docx` resume |
+| A6 Company Research | Company brief inside interview prep packs (web search on Anthropic) |
+| A7 Networking & Outreach | Outreach page: follow-ups, referral asks, connection notes, weekly invite budget |
+| A8 Content & Brand | Content page: plan, drafts, comment ideas, share-to-LinkedIn |
+| A9 Tracker | Pipeline, contacts, due dates in the user's time zone |
+| A10 Interview Prep | Prep packs and practice feedback |
+| A11 Offer & Negotiation | Offer comparison and negotiation plans |
+| A12 Guardrails | Human-sends-everything, Starter limits, truthfulness check, retention jobs, RLS |
+| A13 Analytics | Insights page (funnel and channels) |
+| A14 Referral Scout | LinkedIn export import, ranking, drafts |
+
+Remaining before launch: live AI runs and prompt tuning, real-LinkedIn testing of the extension, OAuth / email / inbound-email / deployment setup, legal review, Chrome Web Store, observability and evals.

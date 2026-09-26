@@ -44,3 +44,11 @@ export function pickDocument(docs: StoredDocument[] | null, ...kinds: string[]):
     if (doc) return doc;
   }
 }
+
+// All of the user's career text (latest resume and LinkedIn PDF), or null when nothing is uploaded.
+export async function loadCareerText(supabase: SupabaseClient): Promise<string | null> {
+  const { data: docs } = await supabase.from("career_documents").select(DOCUMENT_COLUMNS).in("kind", ["resume", "linkedin_pdf"]).order("created_at", { ascending: false });
+  const picked = ["resume", "linkedin_pdf"].map((k) => (docs as StoredDocument[] | null)?.find((d) => d.kind === k)).filter((d): d is StoredDocument => !!d);
+  if (!picked.length) return null;
+  return (await Promise.all(picked.map((d) => readDocumentText(supabase, d)))).join("\n\n---\n\n");
+}

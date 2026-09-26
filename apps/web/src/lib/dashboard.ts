@@ -1,4 +1,5 @@
 export const STAGES = [
+  { id: "discovered", label: "Inbox", color: "bg-violet-300" },
   { id: "saved", label: "Saved", color: "bg-zinc-400" },
   { id: "applied", label: "Applied", color: "bg-sky-500" },
   { id: "screen", label: "Screen", color: "bg-amber-500" },
@@ -6,6 +7,7 @@ export const STAGES = [
   { id: "offer", label: "Offer", color: "bg-emerald-500" },
   { id: "rejected", label: "Rejected", color: "bg-rose-400" },
   { id: "withdrawn", label: "Withdrawn", color: "bg-zinc-300" },
+  { id: "dismissed", label: "Dismissed", color: "bg-zinc-200" },
 ] as const;
 
 export type Stage = (typeof STAGES)[number]["id"];
@@ -49,6 +51,7 @@ export type Job = {
   url: string | null;
   location: string | null;
   stage: Stage;
+  source: "manual" | "extension" | "alert" | "ats";
   channel: Channel | null;
   fit_score: number | null;
   description: string | null;
@@ -76,7 +79,7 @@ export type Contact = {
 };
 
 export const JOB_COLUMNS =
-  "id, title, company, url, location, stage, channel, fit_score, description, notes, next_action, next_action_at, applied_at, stage_changed_at, created_at";
+  "id, title, company, url, location, stage, source, channel, fit_score, description, notes, next_action, next_action_at, applied_at, stage_changed_at, created_at";
 export const CONTACT_COLUMNS =
   "id, full_name, company, title, relationship, strength, linkedin_url, referral_status, job_id, notes, last_contacted_at, next_follow_up_at";
 
@@ -96,8 +99,8 @@ export function companyKey(name: string | null | undefined): string | null {
 
 export const sameCompany = (a: string | null, b: string | null) => !!a && !!b && companyKey(a) === companyKey(b);
 
-// Local calendar date (YYYY-MM-DD). On the server this is the server's time zone;
-// storing each user's time zone is a follow-up for due-date accuracy in production.
+// Local calendar date (YYYY-MM-DD) in the browser's time zone. Server code should use userDate()
+// from lib/user-time, which uses the time zone saved on the user's profile.
 export const today = () => new Date().toLocaleDateString("en-CA");
 
 export function daysSince(iso: string) {

@@ -33,6 +33,7 @@ export async function POST(req: Request) {
   let job = null;
   let match = null;
   let connection = null;
+  let screeningAnswers: { question: string; answer: string }[] = [];
 
   if (kind === "job") {
     const canonical = canonicalJobUrl(url);
@@ -49,6 +50,16 @@ export async function POST(req: Request) {
           .limit(1)
           .maybeSingle();
         match = m;
+        // Screening answers from the latest application kit, for filling in Easy Apply by hand.
+        const { data: kit } = await supabase
+          .from("application_kits")
+          .select("result")
+          .eq("job_id", data.id)
+          .eq("status", "complete")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        screeningAnswers = ((kit?.result as { screening_answers?: { question: string; answer: string }[] } | null)?.screening_answers ?? []).slice(0, 12);
       }
     }
   } else if (kind === "profile") {
@@ -74,6 +85,7 @@ export async function POST(req: Request) {
     isExcluded: !!search?.excluded_companies?.some((c: string) => sameCompany(c, company)),
     job,
     match,
+    screeningAnswers,
     connection,
     people,
     jobsAtCompany: (jobsAtCompany ?? []).filter((j) => sameCompany(j.company, company)),

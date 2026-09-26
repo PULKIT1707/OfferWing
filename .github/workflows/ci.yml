@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci --legacy-peer-deps
+      # Generates Next's route type helpers (PageProps, LayoutProps, RouteContext) used by tsc.
+      - run: npx next typegen
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            apps/extension/package-lock.json
+            apps/web/package-lock.json
+      # The extension imports shared code (and its dependencies) from apps/web.
+      - run: npm ci --legacy-peer-deps
+        working-directory: apps/web
+      - run: npm ci
+        working-directory: apps/extension
+      - run: npm run typecheck
+        working-directory: apps/extension
+      - run: npm run build
+        working-directory: apps/extension
+        env:
+          SUPABASE_URL: https://example.supabase.co
+          SUPABASE_PUBLISHABLE_KEY: ci-placeholder

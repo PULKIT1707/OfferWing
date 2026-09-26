@@ -14,7 +14,7 @@ const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 export default async function InsightsPage() {
   const { supabase } = await requireUser();
   const { data } = await supabase.from("jobs").select(JOB_COLUMNS);
-  const jobs = (data ?? []) as Job[];
+  const jobs = ((data ?? []) as Job[]).filter((j) => j.stage !== "discovered" && j.stage !== "dismissed");
   const applied = jobs.filter((j) => reached(j) >= 1);
 
   const funnel = [

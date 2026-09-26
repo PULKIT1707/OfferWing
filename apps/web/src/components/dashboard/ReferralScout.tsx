@@ -4,10 +4,9 @@ import { Check, ExternalLink, FileArchive, Loader2, RefreshCw, Search, Send, Spa
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { saveContact } from "@/app/dashboard/actions";
+import { markDraftSent } from "@/app/dashboard/outreach/actions";
 import { addConnectionToList, deleteImportedConnections, draftReferralAsk, searchConnections, startConnectionImport } from "@/app/dashboard/network/scout-actions";
 import type { Connection, ReferralDraft, ScoredConnection } from "@/lib/agents/referral-scout";
-import { today } from "@/lib/dashboard";
 import { CopyButton } from "./CopyButton";
 import { Button, Modal } from "./ui";
 
@@ -66,7 +65,7 @@ function PersonRow({ p, onList, onDraft, onAdd }: { p: Connection & { score?: nu
 function DraftModal({ person, jobs, onClose }: { person: Connection; jobs: { id: string; title: string }[]; onClose: () => void }) {
   const [jobId, setJobId] = useState<string | null>(jobs[0]?.id ?? null);
   const [draft, setDraft] = useState<ReferralDraft>();
-  const [contactId, setContactId] = useState<string>();
+  const [draftId, setDraftId] = useState<string>();
   const [error, setError] = useState<string>();
   const [sent, setSent] = useState(false);
   const [pending, start] = useTransition();
@@ -79,17 +78,15 @@ function DraftModal({ person, jobs, onClose }: { person: Connection; jobs: { id:
       if (r.error) setError(r.error);
       else {
         setDraft(r.draft);
-        setContactId(r.contactId);
+        setDraftId(r.draftId);
       }
     });
 
   const markSent = () =>
     start(async () => {
-      if (!contactId) return;
-      const followUp = new Date();
-      followUp.setDate(followUp.getDate() + 5);
-      const r = await saveContact(contactId, { referral_status: "asked", last_contacted_at: today(), next_follow_up_at: followUp.toLocaleDateString("en-CA") });
-      if (!r.ok) setError(r.error);
+      if (!draftId) return;
+      const r = await markDraftSent(draftId);
+      if (r.error) setError(r.error);
       else {
         setSent(true);
         router.refresh();
@@ -135,7 +132,7 @@ function DraftModal({ person, jobs, onClose }: { person: Connection; jobs: { id:
               {sent ? (
                 <span className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700"><Check className="size-4" /> Marked as asked · follow-up in 5 days</span>
               ) : (
-                <Button onClick={markSent} disabled={pending || !contactId} className="flex-1"><Send className="size-4" /> I sent it</Button>
+                <Button onClick={markSent} disabled={pending || !draftId} className="flex-1"><Send className="size-4" /> I sent it</Button>
               )}
             </div>
             <button onClick={generate} disabled={pending} className="w-full text-center text-xs text-muted hover:text-wing">Rewrite</button>

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { APP_URL } from "../lib/config";
 
 export const Spinner = () => <span className="spinner" aria-label="Loading" />;
@@ -36,4 +36,21 @@ export const scoreClass = (n: number) => (n >= 70 ? "score good" : n >= 50 ? "sc
 
 export function Notice({ tone = "info", children }: { tone?: "info" | "error" | "warn"; children: ReactNode }) {
   return <p className={`notice ${tone}`}>{children}</p>;
+}
+
+// Copies text; shows "Copied" briefly.
+export function CopyText({ text }: { text: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      className="btn-ghost copy"
+      onClick={async () => {
+        await navigator.clipboard.writeText(text).catch(() => {});
+        setDone(true);
+        setTimeout(() => setDone(false), 1200);
+      }}
+    >
+      {done ? "Copied" : "Copy"}
+    </button>
+  );
 }

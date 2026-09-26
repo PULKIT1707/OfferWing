@@ -1,21 +1,15 @@
-import { Megaphone } from "lucide-react";
 import type { Metadata } from "next";
-import { ComingSoon } from "@/components/dashboard/ComingSoon";
+import { ContentView } from "@/components/dashboard/ContentView";
+import { POST_COLUMNS, type ContentPost } from "@/lib/agents/content";
+import { requireUser } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Content · Offerwing" };
 
-export default function ContentPage() {
-  return (
-    <ComingSoon
-      icon={Megaphone}
-      title="Content"
-      subtitle="Build visibility with hiring managers in your field."
-      features={[
-        "A weekly post plan built around your expertise",
-        "Post drafts written in your voice from your writing samples",
-        "Comment ideas for posts by people at your target companies",
-        "Publishing only after you approve, plus performance tracking",
-      ]}
-    />
-  );
+// Planning and drafting call the AI model from server actions on this route.
+export const maxDuration = 120;
+
+export default async function ContentPage() {
+  const { supabase } = await requireUser();
+  const { data } = await supabase.from("content_posts").select(POST_COLUMNS).neq("status", "archived").order("planned_for", { ascending: true });
+  return <ContentView posts={(data ?? []) as ContentPost[]} />;
 }

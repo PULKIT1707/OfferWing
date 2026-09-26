@@ -24,9 +24,9 @@ const NAV = [
   { href: "/dashboard/profile", label: "Profile health", icon: Gauge },
   { href: "/dashboard/jobs", label: "Jobs pipeline", icon: Briefcase },
   { href: "/dashboard/network", label: "Referrals & network", icon: Users },
-  { href: "/dashboard/outreach", label: "Outreach", icon: MessageSquare, soon: true },
-  { href: "/dashboard/content", label: "Content", icon: Megaphone, soon: true },
-  { href: "/dashboard/interviews", label: "Interviews & offers", icon: CalendarCheck, soon: true },
+  { href: "/dashboard/outreach", label: "Outreach", icon: MessageSquare },
+  { href: "/dashboard/content", label: "Content", icon: Megaphone },
+  { href: "/dashboard/interviews", label: "Interviews & offers", icon: CalendarCheck },
   { href: "/dashboard/insights", label: "Insights", icon: BarChart3 },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
@@ -35,7 +35,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const path = usePathname();
   return (
     <nav className="space-y-0.5">
-      {NAV.map(({ href, label, icon: Icon, soon }) => {
+      {NAV.map(({ href, label, icon: Icon }) => {
         const active = href === "/dashboard" ? path === href : path.startsWith(href);
         return (
           <Link
@@ -48,7 +48,6 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           >
             <Icon className={`size-4 ${active ? "text-wing-soft" : ""}`} />
             <span className="flex-1">{label}</span>
-            {soon && <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">Soon</span>}
           </Link>
         );
       })}

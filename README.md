@@ -2,7 +2,7 @@
 
 AI job-search agents for LinkedIn users. Offerwing audits your profile, scores jobs against your background, writes a tailored resume and application kit for each role, and finds people in your network who can refer you. Everything it writes is a draft you review. It never logs into LinkedIn or sends anything on your behalf.
 
-> Status: early build. The web app and six agents are working. The browser extension, outreach queue, content, and interview/offer tools are in progress. The full product plan is in [PLAN.md](PLAN.md).
+> Status: feature-complete early build. The web app, the Chrome extension and every agent in the plan are built and tested up to the AI call; they still need a live run with a real AI key before launch. The full product plan is in [PLAN.md](PLAN.md).
 
 ---
 
@@ -29,13 +29,18 @@ AI job-search agents for LinkedIn users. Offerwing audits your profile, scores j
 
 | Area | Page | What happens |
 |---|---|---|
+| Today | `/dashboard` | Due items, referral opportunities, inbox count and a **Career Coach** weekly plan built from the state of your search. |
 | Onboarding | `/onboarding` | A wizard that collects target roles, locations, work mode, seniority, salary, sponsorship needs, companies to avoid, your resume / LinkedIn PDF, and how AI should be powered. |
 | Profile health | `/dashboard/profile` | **Profile Optimizer** scores your LinkedIn profile from 0 to 100 by section and writes headline variants, an About draft, experience rewrites, skills to pin, keyword gaps and quick wins. |
-| Jobs pipeline | `/dashboard/jobs` | A kanban board of jobs. **Job Match** scores fit, lists requirements you meet (with evidence) and gaps, flags preference conflicts and ghost-job signals, and recommends how to apply. |
+| Jobs pipeline | `/dashboard/jobs` | An **Inbox** of newly discovered jobs (from forwarded LinkedIn alerts and followed careers pages) above a kanban board. **Job Match** scores fit, lists requirements you meet (with evidence) and gaps, flags preference conflicts and ghost-job signals, and recommends how to apply. |
 | Application kit | `/dashboard/jobs/[id]/kit` | **Application Tailor** writes a job-specific resume (downloadable as `.docx`), cover note, LinkedIn connection note and screening answers. A **truthfulness check** flags anything it can't trace back to your documents. |
 | Referrals & network | `/dashboard/network` | Import your LinkedIn data export ZIP. **Referral Scout** ranks connections at each target company and drafts referral asks. |
+| Outreach | `/dashboard/outreach` | Follow-ups due (max two per person), people to ask for referrals, connection notes for recruiters and hiring managers, a weekly invite budget and recent drafts. You send everything yourself. |
+| Content | `/dashboard/content` | A two-week post plan, drafts in your voice with alternative hooks, "Open in LinkedIn" pre-filled posts and comment ideas for posts you paste. |
+| Interviews & offers | `/dashboard/interviews` | A STAR story bank built from your resume, per-job prep packs (with web research on Anthropic), practice feedback, offer comparison and negotiation plans. |
 | Insights | `/dashboard/insights` | Pipeline and activity metrics. |
-| Settings | `/dashboard/settings` | AI mode and provider key, export all your data as JSON, delete your account. |
+| Settings | `/dashboard/settings` | Job sources (alert forwarding address and followed careers pages), AI mode and provider key, export all your data as JSON, delete your account. |
+| Browser extension | `apps/extension` | Chrome side panel on LinkedIn job, profile and company pages: fit score, who you know, save to pipeline, screening answers. Reads a page only when you click. |
 
 ## Tech stack
 
@@ -64,8 +69,16 @@ OfferWing/
 │       ├── 0003_profile_audits.sql profile_audits, get_user_ai_key()
 │       ├── 0004_job_matches.sql   job_matches, cached extracted_text on documents
 │       ├── 0005_application_kits.sql application_kits
-│       └── 0006_referral_scout.sql connection_imports, connections, outreach_drafts
+│       ├── 0006_referral_scout.sql connection_imports, connections, outreach_drafts
+│       ├── 0007_extension.sql     private-mode match results, job lookup by URL
+│       ├── 0008_job_discovery.sql discovered/dismissed stages, job_sources, inbound_emails, time zones, purge_stale_data()
+│       ├── 0009_outreach.sql      follow-ups and connection notes, send tracking
+│       ├── 0010_interviews_offers.sql stories, interview_preps, practice_answers, offers
+│       ├── 0011_content.sql       content_posts, agent_runs (Starter limits)
+│       └── 0012_weekly_plans.sql  weekly_plans
+├── .github/workflows/ci.yml       Lint, type check, tests and extension build
 └── apps/
+    ├── extension/                 Chrome MV3 side panel (esbuild + React); see apps/extension/README.md
     └── web/                       Next.js app
         └── src/
             ├── proxy.ts           Session refresh and route protection (Next 16 "proxy", formerly middleware)
@@ -75,7 +88,7 @@ OfferWing/
             │   ├── auth/          OAuth callback, sign-out
             │   ├── onboarding/    Wizard page and server actions
             │   ├── dashboard/     All signed-in pages and their server actions
-            │   └── api/           export, kits/[id]/resume (.docx download)
+            │   └── api/           export, kits/[id]/resume, ext/* (extension), inbound/email, cron/*
             ├── components/        landing/, auth/, onboarding/, dashboard/
             └── lib/
                 ├── agents/        Prompt, schema and runner for each agent
@@ -83,7 +96,11 @@ OfferWing/
                 ├── supabase/      Browser, server and service-role clients
                 ├── documents.ts   PDF/DOCX text extraction with per-document caching
                 ├── resume-docx.ts ATS-friendly .docx resume renderer
-                └── linkedin-export.ts  LinkedIn data-export ZIP parser
+                ├── linkedin-export.ts  LinkedIn data-export ZIP parser
+                ├── job-alerts.ts  LinkedIn job-alert email parser
+                ├── job-sources.ts Greenhouse / Lever / Ashby career-board fetchers
+                ├── discovery.ts   Inbox ingestion for alerts and career boards
+                └── time.ts        Dates in the user's time zone
 ```
 
 ## Getting started
@@ -105,7 +122,7 @@ npm install
 ### 2. Set up Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Apply the migrations **in order** (`0001` → `0006`). Either:
+2. Apply the migrations **in order** (`0001` → `0012`). Either:
    - paste each file from `supabase/migrations/` into **SQL Editor** and run it, or
    - with the Supabase CLI: `supabase link --project-ref <ref>` then `supabase db push` from the repo root.
 3. Check that the **Vault** extension is enabled (Database → Extensions → `supabase_vault`). It is on by default in new projects and is needed for Always-on keys.
@@ -138,8 +155,12 @@ Set these in `apps/web/.env.local`. It's gitignored; never commit it.
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Project URL (Project Settings → API). |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Publishable (anon) key. Safe in the browser because RLS protects the data. |
-| `SUPABASE_SERVICE_ROLE_KEY` | For Always-on mode | **Server-only** secret key. Used only to call `get_user_ai_key()` to decrypt a user's Vault-stored key during an agent run. Without it, Always-on mode shows a clear error. |
+| `SUPABASE_SERVICE_ROLE_KEY` | For Always-on mode, inbound email and cron | **Server-only** secret key. Used to decrypt a user's Vault-stored key during an agent run (`get_user_ai_key()`), to file forwarded alert emails (no user session exists for inbound mail) and by the scheduled jobs. |
 | `OFFERWING_STARTER_ANTHROPIC_API_KEY` | For Starter mode | Offerwing's own Anthropic key that powers free Starter usage, within the daily limits below. |
+| `NEXT_PUBLIC_EXTENSION_ID` | For the extension | The only extension ID `/extension/connect` will hand a session to. The dev build's ID is fixed by the manifest `key`: `mgoonaiikahlemfjhcdgpdgjmkjjbmbc`. |
+| `INBOUND_EMAIL_SECRET` | For alert forwarding | Shared secret your inbound-email provider sends as `?secret=` when it POSTs to `/api/inbound/email`. |
+| `ALERT_EMAIL_DOMAIN` | No | Domain of users' alert addresses. Default `alerts.offerwing.ai`. |
+| `CRON_SECRET` | For scheduled jobs | Vercel Cron sends it as `Authorization: Bearer …` to `/api/cron/*`. |
 | `OFFERWING_<PROVIDER>_MODEL_<TIER>` | No | Overrides the default model for one provider and tier, e.g. `OFFERWING_OPENAI_MODEL_PREMIUM=gpt-5`. Provider: `ANTHROPIC`, `OPENAI` or `GEMINI`. Tier: `PREMIUM`, `STANDARD` or `FAST`. |
 
 ## Architecture
@@ -195,12 +216,16 @@ All user tables have `user_id` and **row-level security** limiting access to `au
 | `ai_settings` | AI mode (`starter` / `private` / `cloud`), provider, `key_last4`, and a pointer to the Vault secret. Clients can only **read** it; writes go through RPCs. |
 | `jobs`, `contacts` | Pipeline (with `stage` and `fit_score`) and people tied to jobs. |
 | `profile_audits`, `job_matches`, `application_kits` | Agent runs: status, JSONB result, model, token counts, error. |
-| `connection_imports`, `connections`, `outreach_drafts` | LinkedIn export imports, normalized connections (grouped by `company_key`), and referral drafts. |
+| `connection_imports`, `connections`, `outreach_drafts` | LinkedIn export imports, normalized connections (grouped by `company_key`), and outreach drafts (referral asks, follow-ups, connection notes) with `sent_at`. |
+| `job_sources`, `inbound_emails` | Followed careers pages, and metadata (sender, subject, jobs found) of forwarded alert emails. Email bodies are never stored. |
+| `stories`, `interview_preps`, `practice_answers`, `offers` | STAR story bank, prep packs, practice feedback, offers with negotiation plans. |
+| `content_posts`, `weekly_plans`, `agent_runs` | Post ideas and drafts, Career Coach plans, and a run log used for Starter limits. |
 
 Security-definer functions:
 
 - `set_ai_mode(mode, provider)` and `set_cloud_ai_key(provider, key)` write to `ai_settings` and to **Vault** (`vault.create_secret` / `update_secret`). Switching away from cloud mode deletes the secret immediately.
 - `get_user_ai_key(user_id)` reads from `vault.decrypted_secrets`. It can only be executed by the service role, and the key is only ever held in server memory for the length of a call.
+- `purge_stale_data()` (service role only, run daily by `/api/cron/cleanup`) deletes imported connections not re-imported within 90 days unless they're on a referral list, and inbound email records after 30 days.
 - `delete_my_account()` removes the user's Vault secrets and their `auth.users` row, and all their data is removed by cascade. The Settings action deletes their uploaded files from Storage first.
 
 Privacy choices built into the code:
@@ -221,6 +246,12 @@ Each agent lives in `src/lib/agents/` as a system prompt, a context builder, a Z
 | Application Tailor | `application-tailor.ts` | standard | Tailored resume where each bullet carries an `evidence` quote, cover note (150–250 words), connection note (≤ 300 characters), screening answers, change log, `needs_input` |
 | Truthfulness check | `truthfulness.ts` | — (deterministic) | Checks the kit against the source documents and flags invented companies, titles, numbers, unsupported bullets and unverified skills |
 | Referral Scout | `referral-scout.ts` | — / standard | Heuristic ranking of connections per company (role similarity, seniority, recruiters, recent messages), then LLM-drafted referral asks |
+| Job Discovery | `lib/discovery.ts`, `job-alerts.ts`, `job-sources.ts` | — (deterministic) | Parses forwarded LinkedIn alert emails and polls Greenhouse / Lever / Ashby boards; matches titles to target roles by head noun; dedupes by source ID and URL; skips avoided companies |
+| Outreach | `outreach.ts` | standard | Referral asks, follow-ups (at most two) and connection notes (≤ 300 characters) |
+| Interview coach | `interviews.ts` | standard | Story bank extraction, prep packs (company brief with web research on Anthropic, likely questions matched to stories, "tell me about yourself", questions to ask), practice feedback |
+| Negotiation | `negotiation.ts` | premium | Assessment, leverage, a concrete ask, email script, call points and fallbacks. No invented competing offers. |
+| Content | `content.ts` | standard / fast | Two-week plan, post drafts in the user's voice, comment ideas; discreet in stealth mode |
+| Career Coach | `coach.ts` | standard | A weekly plan with 4–6 prioritized actions from a snapshot of the user's search |
 
 **No-fabrication rule.** Prompts tell models to use only facts in the user's documents. Where a fact is missing, they insert a `[placeholder]` and list it in `needs_input`, rather than guessing.
 
@@ -230,9 +261,9 @@ Users choose how AI is powered during onboarding and can change it any time in S
 
 | Mode | Key location | Status |
 |---|---|---|
-| **Starter** (default) | Offerwing's `OFFERWING_STARTER_ANTHROPIC_API_KEY` | Daily limits per user: **2** profile audits, **20** job matches, **5** application kits, **20** outreach drafts |
+| **Starter** (default) | Offerwing's `OFFERWING_STARTER_ANTHROPIC_API_KEY` | Daily limits per user, e.g. **2** profile audits, **20** job matches, **5** application kits, **20** outreach drafts, **5** prep packs, **3** content plans, **3** weekly plans (see `lib/llm/quota.ts` and each agent module) |
 | **Always-on** (`cloud`) | User's own OpenAI / Anthropic / Gemini key, encrypted in Supabase Vault | Unlimited, limited only by the user's own provider account |
-| **Private** | User's key kept only in the browser extension | Needs the extension, which is in progress. The web app explains this instead of failing silently. |
+| **Private** | User's key kept only in the browser extension | Job scoring runs in the extension, straight from the browser to the provider. Web-only agents explain that they need Starter or Always-on. |
 
 `resolveCredential()` in [`lib/llm/credentials.ts`](apps/web/src/lib/llm/credentials.ts) picks the key for each run from the user's mode.
 
@@ -248,6 +279,11 @@ Users choose how AI is powered during onboarding and can change it any time in S
 | `/dashboard/*` | Pages (protected) | See [What it does](#what-it-does) |
 | `GET /api/export` | Route handler | Downloads all user data as JSON |
 | `GET /api/kits/[id]/resume` | Route handler | Downloads a tailored resume as `.docx` (RLS-scoped) |
+| `/extension/connect` | Page (protected) | Hands the session to the pinned extension ID after the user clicks Connect |
+| `/api/ext/*` | Route handlers | Extension API (`me`, `lookup`, `jobs`, `context`, `matches`, `contacts`), authenticated with the user's Bearer token; RLS applies |
+| `POST /api/inbound/email` | Route handler | Inbound-email webhook (Postmark JSON or SendGrid form posts), protected by `INBOUND_EMAIL_SECRET` |
+| `GET /api/cron/discovery`, `/api/cron/cleanup` | Route handlers | Scheduled in `apps/web/vercel.json`, protected by `CRON_SECRET` |
+| `/privacy`, `/terms` | Pages | Drafts for legal review |
 
 Protected routes are enforced in [`src/proxy.ts`](apps/web/src/proxy.ts), which also refreshes the Supabase session cookie on every matched request.
 
@@ -261,6 +297,8 @@ Run from `apps/web`:
 | `npm run build` | Production build (includes type checking) |
 | `npm run start` | Serve the production build |
 | `npm run lint` | ESLint (`eslint-config-next`) |
+| `npm test` | Unit tests (Vitest) for parsers, scoring, the truthfulness check and date handling |
+| `npm run typecheck` | `tsc --noEmit` (run `npx next typegen` first on a fresh checkout) |
 
 ## Deployment
 
@@ -270,6 +308,9 @@ The app is built for **Vercel**:
 2. Add the environment variables above for Production (and Preview if you use it).
 3. In Supabase → Auth → URL Configuration, add your production URL and `https://<your-domain>/auth/callback`.
 4. Agent routes use `maxDuration = 300`. Check that your Vercel plan allows functions to run that long, or lower it.
+5. **Scheduled jobs:** `apps/web/vercel.json` runs `/api/cron/discovery` every 6 hours and `/api/cron/cleanup` daily. Set `CRON_SECRET` and `SUPABASE_SERVICE_ROLE_KEY`.
+6. **Alert forwarding:** point an inbound-email provider (for example Postmark inbound, or SendGrid Inbound Parse) at `https://<your-domain>/api/inbound/email?secret=<INBOUND_EMAIL_SECRET>`, and add an MX record for `alerts.<your-domain>` as the provider instructs. Users' addresses are `<alert_alias>@alerts.<your-domain>`.
+7. **Extension:** build with `OFFERWING_APP_URL=https://<your-domain> npm run build` in `apps/extension`, and publish it on the Chrome Web Store.
 
 Any Node host that runs `next start` also works, but `after()` needs a runtime that keeps the process alive after the response is sent.
 
@@ -282,14 +323,15 @@ Any Node host that runs `next start` also works, but `after()` needs a runtime t
 
 ## Roadmap
 
-Built: onboarding, profile audit, jobs pipeline with fit scoring, application kits with `.docx` resumes and truthfulness checks, LinkedIn export import and Referral Scout, data export and account deletion.
+Built: onboarding, profile audit, job discovery inbox (alert emails and careers pages), pipeline with fit scoring, application kits with `.docx` resumes and truthfulness checks, Referral Scout, outreach queue, content, interview prep and practice, offers and negotiation, Career Coach weekly plans, the Chrome extension with Private mode, data export, account deletion and retention jobs.
 
-Next (see [PLAN.md](PLAN.md)):
+Before launch:
 
-- **Browser extension (Chrome MV3)**: a side panel on LinkedIn pages you open, to save and score jobs and see referral paths in place. Also powers Private mode.
-- Outreach approval queue, content and personal-brand drafts, interview prep and offer comparison.
-- Job-alert email forwarding (`<alias>@alerts.…`), ATS board polling, daily brief.
-- Billing, observability and evals for each agent.
+- A **live run** of every agent with a real AI key, then prompt tuning on real output.
+- Try the extension on **real LinkedIn pages** and adjust the page-reading rules.
+- Configure Google / LinkedIn sign-in, a production email sender, the inbound-email provider, and deployment.
+- Legal review of `/privacy` and `/terms`; Chrome Web Store submission.
+- Observability (error tracking, AI spend per user) and evals for each agent.
 
 ## License
 

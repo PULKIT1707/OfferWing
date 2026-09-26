@@ -8,6 +8,7 @@ import { getLatestMatch, getScoringStatus, startJobMatches } from "@/app/dashboa
 import type { MatchRun } from "@/lib/agents/job-match";
 import { daysSince, OPEN_STAGES, sameCompany, STAGES, today, type Contact, type Job, type Stage } from "@/lib/dashboard";
 import { JobForm } from "./JobForm";
+import { JobInbox } from "./JobInbox";
 import { JobMatchPanel } from "./JobMatchPanel";
 import { Button, EmptyState, Modal, PageHeader } from "./ui";
 
@@ -134,7 +135,19 @@ export function JobsBoard({ initialJobs, contacts }: { initialJobs: Job[]; conta
     });
   }
 
-  const closed = jobs.filter((j) => !OPEN_STAGES.includes(j.stage));
+  const inbox = jobs.filter((j) => j.stage === "discovered");
+  const closed = jobs.filter((j) => !OPEN_STAGES.includes(j.stage) && j.stage !== "discovered");
+
+  // Saving from the inbox moves the job into the pipeline and scores it when it has a description.
+  function saveFromInbox(j: Job) {
+    move(j.id, "saved");
+    if (j.description) {
+      void startJobMatches([j.id]).then(async (r) => {
+        if (r.error) setError(`Saved, but couldn't score it: ${r.error}`);
+        else if (r.queued) setScoring((await getScoringStatus()).running);
+      });
+    }
+  }
   return (
     <div>
       <PageHeader
@@ -157,11 +170,13 @@ export function JobsBoard({ initialJobs, contacts }: { initialJobs: Job[]; conta
       {error && <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
       {notice && <p className="mb-4 rounded-lg bg-wing/5 px-3 py-2 text-sm text-wing">{notice}</p>}
 
-      {jobs.length === 0 ? (
+      <JobInbox jobs={inbox} onSave={saveFromInbox} onDismiss={(j) => move(j.id, "dismissed")} />
+
+      {jobs.length === inbox.length ? (
         <EmptyState
           icon={<Briefcase className="size-6" />}
           title="No jobs yet"
-          body="Add roles you've found or applied to. Once agents are live, jobs from your LinkedIn alerts and the extension land here automatically, with fit scores."
+          body="Add roles you've found or applied to, save them from your inbox, or save them from LinkedIn with the Offerwing extension."
           action={<Button onClick={() => setEditing("new")}><Plus className="size-4" /> Add your first job</Button>}
         />
       ) : (

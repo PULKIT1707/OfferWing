@@ -236,7 +236,6 @@ export function ConnectStep({ alertAlias, onBack }: { alertAlias: string; onBack
         <div className="rounded-2xl border border-line bg-white p-5">
           <div className="flex items-center gap-2">
             <p className="font-medium">Forward LinkedIn job alerts</p>
-            <span className="rounded-full bg-card px-2 py-0.5 text-[11px] font-medium text-muted">Coming soon</span>
           </div>
           <p className="mt-1 text-sm text-muted">Your personal alert address. Agents will score every job LinkedIn emails you.</p>
           <div className="mt-4 flex items-center gap-2 rounded-xl bg-card px-4 py-3 font-mono text-sm">
@@ -254,15 +253,14 @@ export function ConnectStep({ alertAlias, onBack }: { alertAlias: string; onBack
               {copied ? <Check className="size-4 text-wing" /> : <Copy className="size-4" />}
             </button>
           </div>
-          <p className="mt-2 text-xs text-muted">We&apos;ll email you step-by-step Gmail and Outlook instructions as soon as alert forwarding is live.</p>
+          <p className="mt-2 text-xs text-muted">Step-by-step Gmail and Outlook setup is in Settings → Job sources. You can also follow company careers pages there.</p>
         </div>
 
         <div className="rounded-2xl border border-line bg-white p-5">
           <div className="flex items-center gap-2">
             <p className="font-medium">Install the browser extension</p>
-            <span className="rounded-full bg-card px-2 py-0.5 text-[11px] font-medium text-muted">Coming soon</span>
           </div>
-          <p className="mt-1 text-sm text-muted">Fit scores, referral paths and ready drafts right beside LinkedIn, only when you click.</p>
+          <p className="mt-1 text-sm text-muted">Fit scores, referral paths and one-click saving right beside LinkedIn, only when you click. After installing, connect it at offerwing.ai/extension/connect.</p>
         </div>
       </div>
       <StepFooter busy={pending} error={error} onBack={onBack} label="Go to my dashboard" />

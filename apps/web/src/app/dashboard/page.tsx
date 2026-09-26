@@ -1,10 +1,17 @@
-import { ArrowRight, Briefcase, CalendarClock, Check, Circle, Handshake, Sparkles, Trophy, Users } from "lucide-react";
+import { ArrowRight, Briefcase, CalendarClock, Check, Circle, Handshake, Inbox, Trophy, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { ACTIVE_STAGES, CONTACT_COLUMNS, JOB_COLUMNS, sameCompany, today, type Contact, type Job } from "@/lib/dashboard";
+import { ACTIVE_STAGES, CONTACT_COLUMNS, JOB_COLUMNS, sameCompany, type Contact, type Job } from "@/lib/dashboard";
+import { userDate, userTimeZone } from "@/lib/user-time";
+import { weekStartInZone } from "@/lib/time";
+import type { WeeklyPlan } from "@/lib/agents/coach";
+import { WeeklyPlanCard } from "@/components/dashboard/WeeklyPlanCard";
 
 export const metadata: Metadata = { title: "Today · Offerwing" };
+
+// "Plan my week" calls the AI model from a server action on this route.
+export const maxDuration = 60;
 
 function Stat({ icon: Icon, label, value, href }: { icon: typeof Briefcase; label: string; value: number; href: string }) {
   return (
@@ -27,9 +34,18 @@ export default async function TodayPage() {
     supabase.from("jobs").select(JOB_COLUMNS),
     supabase.from("contacts").select(CONTACT_COLUMNS),
   ]);
-  const jobs = (jobsData ?? []) as Job[];
+  const allJobs = (jobsData ?? []) as Job[];
+  // Inbox (discovered) and dismissed jobs aren't part of the pipeline yet.
+  const inboxCount = allJobs.filter((j) => j.stage === "discovered").length;
+  const jobs = allJobs.filter((j) => j.stage !== "discovered" && j.stage !== "dismissed");
   const contacts = (contactsData ?? []) as Contact[];
-  const now = today();
+  const now = await userDate(supabase, userId);
+  const { data: weeklyPlan } = await supabase
+    .from("weekly_plans")
+    .select("plan")
+    .eq("user_id", userId)
+    .eq("week_start", weekStartInZone(await userTimeZone(supabase, userId)))
+    .maybeSingle();
 
   const hasDoc = (kind: string) => docs?.some((d) => d.kind === kind) ?? false;
   const setup = [
@@ -70,6 +86,16 @@ export default async function TodayPage() {
         {greeting}
         {firstName ? `, ${firstName}` : ""}.
       </h1>
+
+      {inboxCount > 0 && (
+        <Link href="/dashboard/jobs" className="mt-6 flex items-center gap-3 rounded-3xl bg-wing px-5 py-4 text-white hover:bg-wing-soft">
+          <Inbox className="size-5" />
+          <span className="flex-1 font-medium">
+            {inboxCount} new {inboxCount === 1 ? "job" : "jobs"} in your inbox
+          </span>
+          <ArrowRight className="size-4" />
+        </Link>
+      )}
 
       <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat icon={Briefcase} label="Active applications" value={jobs.filter((j) => ACTIVE_STAGES.includes(j.stage)).length} href="/dashboard/jobs" />
@@ -158,14 +184,7 @@ export default async function TodayPage() {
             </section>
           )}
 
-          <section className="relative overflow-hidden rounded-3xl bg-ink p-6 text-white">
-            <div className="pointer-events-none absolute -right-16 -top-16 size-56 rounded-full bg-wing/40 blur-[80px]" />
-            <Sparkles className="relative size-5 text-wing-soft" />
-            <h2 className="relative mt-4 font-semibold">Your AI agents are coming</h2>
-            <p className="relative mt-2 text-sm text-white/65">
-              Profile audits, job fit scores, referral maps and message drafts will appear here. Everything you add now gives them a head start.
-            </p>
-          </section>
+          <WeeklyPlanCard plan={(weeklyPlan?.plan as WeeklyPlan | undefined) ?? null} />
         </div>
       </div>
     </div>

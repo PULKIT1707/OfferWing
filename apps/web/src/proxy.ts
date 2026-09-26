@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED = ["/onboarding", "/dashboard"];
+const PROTECTED = ["/onboarding", "/dashboard", "/extension"];
 const AUTH_PAGES = ["/login", "/signup"];
 
 export async function proxy(request: NextRequest) {
@@ -46,5 +46,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/onboarding/:path*", "/dashboard/:path*", "/login", "/signup", "/auth/:path*"],
+  matcher: ["/onboarding/:path*", "/dashboard/:path*", "/extension/:path*", "/login", "/signup", "/auth/:path*"],
 };

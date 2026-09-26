@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Offerwing",
+  "version": "0.1.0",
+  "description": "Your AI job-search copilot on LinkedIn: fit scores, who can refer you, and your next step. Never clicks or sends for you.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqsv5Rl5ozOqmPAn0dayxS8xWzVq9yvaWEbOLSo27bre9Q5gk5vQDkE/YjGUDn/eoIkQa3FreRh0Un/RZc1sjdPM9qAAFTnoW4m4DPJ+eTJdTFDakCcvJ08kCZ1vGdyt3GwDdPeTL+b/0/VNJwKY/Bgl7yGBc3hBStOIy2bnGgBT3Sfnz9WXBXr6dXgw154Q1lKHG9fgxkZOIwCrAAjDbOmIfaGJvWTA5PWjD5Ap87oxm5lWFu4vfPrLN9LQ8HaWOZ9aXAj3irbgQIXUIFFrAe3+j+sujMV3t/L6KwHF0dvbuhOs175nfn4/ajcBvwzUfySXY88xUkhyB1ftypyvcxwIDAQAB",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "action": { "default_title": "Offerwing", "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" } },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["sidePanel", "storage", "scripting"],
+  "host_permissions": [
+    "https://www.linkedin.com/*",
+    "__APP_PATTERN__",
+    "__SUPABASE_PATTERN__",
+    "https://api.anthropic.com/*",
+    "https://api.openai.com/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "externally_connectable": { "matches": ["__APP_PATTERN__"] }
+}

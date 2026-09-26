@@ -1,6 +1,9 @@
 import { strFromU8, unzipSync } from "fflate";
 import Papa from "papaparse";
 import { companyKey } from "@/lib/dashboard";
+import { normalizeProfileUrl } from "@/lib/linkedin-urls";
+
+export { normalizeProfileUrl };
 
 // Parses LinkedIn's "Get a copy of your data" ZIP. Keeps only what Referral Scout needs:
 // no email addresses, and messages reduced to per-person counts and last-contact dates.
@@ -23,12 +26,6 @@ export type ParsedExport = {
 };
 
 const WANTED = /(^|\/)(connections|messages|positions)\.csv$/i;
-
-export function normalizeProfileUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  const m = url.trim().toLowerCase().match(/linkedin\.com\/in\/([^/?#\s]+)/);
-  return m ? `https://www.linkedin.com/in/${decodeURIComponent(m[1])}` : null;
-}
 
 // LinkedIn CSVs can start with a "Notes:" preamble before the real header row.
 function parseCsv(text: string, headerStartsWith: string): Record<string, string>[] {

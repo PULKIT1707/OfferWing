@@ -9,6 +9,7 @@ const links = [
   ["Extension", "#extension"],
   ["Agents", "#agents"],
   ["Pricing", "#pricing"],
+  ["Teams", "#teams"],
   ["FAQ", "#faq"],
 ];
 

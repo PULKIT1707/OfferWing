@@ -5,6 +5,7 @@ import { api, ApiError } from "../lib/api";
 import { APP_URL } from "../lib/config";
 import { extractPage, type Extracted } from "../lib/extract";
 import { supabase } from "../lib/supabase";
+import { ApplyView } from "./ApplyView";
 import { JobView } from "./JobView";
 import { CompanyView, ProfileView } from "./OtherViews";
 import { Settings } from "./Settings";
@@ -120,10 +121,12 @@ export function App() {
         error ? <Notice tone="error">{error}</Notice> : <div className="center"><Spinner /></div>
       ) : !me.onboarded ? (
         <Card><p>Finish setting up Offerwing first.</p><a className="link" href={`${APP_URL}/onboarding`} target="_blank" rel="noreferrer">Continue setup →</a></Card>
+      ) : tab && !onLinkedIn && /^https:\/\//.test(tab.url) ? (
+        <ApplyView key={tab.url} me={me} tab={tab} />
       ) : !onLinkedIn || kind === "other" ? (
         <Card>
           <p className="title-sm">Open a LinkedIn job, profile or company page</p>
-          <p className="muted small">Then click Analyze to see your fit, who you know there and your next step.</p>
+          <p className="muted small">Then click Analyze to see your fit, who you know there and your next step. On a job application form (Greenhouse, Lever, Ashby, Workday…), Offerwing can fill it in for you to review.</p>
         </Card>
       ) : !lookup ? (
         <Card>

@@ -612,7 +612,7 @@ Every widget shows its **source and "last synced" time**, so numbers are never m
 
 ## 17. Build status (September 2026)
 
-Every agent in the plan and both surfaces (web app and Chrome extension) are built. All are tested up to the AI call; none has run against a real model yet.
+Every agent in the plan, the B2B additions below, and both surfaces (web app and Chrome extension) are built. All are tested up to the AI call; none has run against a real model yet.
 
 | Plan item | Built as |
 |---|---|
@@ -631,5 +631,14 @@ Every agent in the plan and both surfaces (web app and Chrome extension) are bui
 | A12 Guardrails | Human-sends-everything, Starter limits, truthfulness check, retention jobs, RLS |
 | A13 Analytics | Insights page (funnel and channels) |
 | A14 Referral Scout | LinkedIn export import, ranking, drafts |
+| A15 Application Autofill | Extension fills Greenhouse / Lever / Ashby / Workday / SmartRecruiters / Workable forms (other sites after a per-site permission) from application details, the kit and the resume; drafts open answers; the user submits. Never touches demographic or consent questions. |
+| A16 Referral Packet | Public `/r/<token>` page per job and referrer: evidence-checked fit points, referral-form blurb, tailored resume, view counts, 30-day expiry, Offerwing sign-up link (growth loop) |
+
+### 17.1 Business model (added September 2026)
+
+Job seekers stay free. Revenue comes from teams:
+
+- **B2B outplacement** (primary): an employer creates an outplacement program at `/org`, invites leavers with seat-limited links, sponsors their AI with its own key (members' runs skip Starter limits), brands it, and sees program totals (5+ members) plus individual progress for people who opt in. Seats and sponsorship dates are set by Offerwing per contract.
+- **Opt-in talent marketplace** (second): candidates publish an anonymous, fact-checked profile ("Get discovered"); recruiting teams that Offerwing has verified search it and request intros; the candidate accepts (sharing contact details, role added to their pipeline) or declines. Candidates hide from named companies, their current employer by default. Search access is what a recruiting team would pay for.
 
 Remaining before launch: live AI runs and prompt tuning, real-LinkedIn testing of the extension, OAuth / email / inbound-email / deployment setup, legal review, Chrome Web Store, observability and evals.

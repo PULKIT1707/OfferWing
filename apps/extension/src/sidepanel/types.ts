@@ -9,6 +9,7 @@ export type Me = {
   targetRoles: string[];
   hasResume: boolean;
   connectionsImported: boolean;
+  hasApplicationProfile: boolean;
 };
 
 export type Person = ScoredConnection & { listStatus: string | null };

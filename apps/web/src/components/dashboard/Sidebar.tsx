@@ -2,6 +2,7 @@
 
 import {
   BarChart3,
+  Building2,
   Briefcase,
   CalendarCheck,
   Gauge,
@@ -10,6 +11,7 @@ import {
   Megaphone,
   Menu,
   MessageSquare,
+  Radar,
   Settings,
   Users,
   X,
@@ -27,11 +29,12 @@ const NAV = [
   { href: "/dashboard/outreach", label: "Outreach", icon: MessageSquare },
   { href: "/dashboard/content", label: "Content", icon: Megaphone },
   { href: "/dashboard/interviews", label: "Interviews & offers", icon: CalendarCheck },
+  { href: "/dashboard/talent", label: "Get discovered", icon: Radar },
   { href: "/dashboard/insights", label: "Insights", icon: BarChart3 },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+function NavLinks({ onNavigate, badges }: { onNavigate?: () => void; badges: Record<string, number> }) {
   const path = usePathname();
   return (
     <nav className="space-y-0.5">
@@ -48,6 +51,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           >
             <Icon className={`size-4 ${active ? "text-wing-soft" : ""}`} />
             <span className="flex-1">{label}</span>
+            {badges[href] ? <span className="rounded-full bg-offer px-1.5 text-xs font-semibold text-ink">{badges[href]}</span> : null}
           </Link>
         );
       })}
@@ -73,7 +77,39 @@ function Account({ name, email }: { name: string | null; email: string | null })
   );
 }
 
-export function Sidebar({ name, email }: { name: string | null; email: string | null }) {
+function SponsorTag({ sponsor }: { sponsor: { name: string; brandColor: string | null } | null }) {
+  if (!sponsor) return null;
+  return (
+    <p className="mx-3 mb-4 rounded-xl bg-white/5 px-3 py-2 text-xs text-white/70">
+      <span className="mr-1.5 inline-block size-2 rounded-full" style={{ background: sponsor.brandColor ?? "var(--wing)" }} />
+      Sponsored by <span className="font-medium text-white">{sponsor.name}</span>
+    </p>
+  );
+}
+
+function OrgLink({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <Link href="/org" className="mt-4 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/60 hover:bg-white/5 hover:text-white">
+      <Building2 className="size-4" /> Organizations
+    </Link>
+  );
+}
+
+export function Sidebar({
+  name,
+  email,
+  sponsor = null,
+  pendingIntros = 0,
+  hasOrgs = false,
+}: {
+  name: string | null;
+  email: string | null;
+  sponsor?: { name: string; brandColor: string | null } | null;
+  pendingIntros?: number;
+  hasOrgs?: boolean;
+}) {
+  const badges = { "/dashboard/talent": pendingIntros };
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -82,7 +118,9 @@ export function Sidebar({ name, email }: { name: string | null; email: string | 
           <Logo className="text-lg" />
         </Link>
         <div className="mt-6 flex-1 overflow-y-auto">
-          <NavLinks />
+          <SponsorTag sponsor={sponsor} />
+          <NavLinks badges={badges} />
+          <OrgLink show={hasOrgs} />
         </div>
         <Account name={name} email={email} />
       </aside>
@@ -106,7 +144,9 @@ export function Sidebar({ name, email }: { name: string | null; email: string | 
               </button>
             </div>
             <div className="mt-6 flex-1 overflow-y-auto">
-              <NavLinks onNavigate={() => setOpen(false)} />
+              <SponsorTag sponsor={sponsor} />
+              <NavLinks onNavigate={() => setOpen(false)} badges={badges} />
+              <OrgLink show={hasOrgs} />
             </div>
             <Account name={name} email={email} />
           </div>

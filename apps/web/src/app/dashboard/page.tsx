@@ -1,7 +1,8 @@
-import { ArrowRight, Briefcase, CalendarClock, Check, Circle, Handshake, Inbox, Trophy, Users } from "lucide-react";
+import { ArrowRight, Briefcase, CalendarClock, Check, Circle, Handshake, Inbox, Radar, Sparkles, Trophy, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
+import { activeSponsor } from "@/lib/orgs";
 import { ACTIVE_STAGES, CONTACT_COLUMNS, JOB_COLUMNS, sameCompany, type Contact, type Job } from "@/lib/dashboard";
 import { userDate, userTimeZone } from "@/lib/user-time";
 import { weekStartInZone } from "@/lib/time";
@@ -27,12 +28,14 @@ const fmt = (d: string) => new Date(d + "T00:00").toLocaleDateString(undefined, 
 
 export default async function TodayPage() {
   const { supabase, userId } = await requireUser();
-  const [{ data: profile }, { data: ai }, { data: docs }, { data: jobsData }, { data: contactsData }] = await Promise.all([
+  const [{ data: profile }, { data: ai }, { data: docs }, { data: jobsData }, { data: contactsData }, sponsor, { count: pendingIntros }] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", userId).single(),
     supabase.from("ai_settings").select("mode").eq("user_id", userId).maybeSingle(),
     supabase.from("career_documents").select("kind"),
     supabase.from("jobs").select(JOB_COLUMNS),
     supabase.from("contacts").select(CONTACT_COLUMNS),
+    activeSponsor(supabase, userId),
+    supabase.from("intro_requests").select("id", { count: "exact", head: true }).eq("talent_user_id", userId).eq("status", "pending"),
   ]);
   const allJobs = (jobsData ?? []) as Job[];
   // Inbox (discovered) and dismissed jobs aren't part of the pipeline yet.
@@ -51,7 +54,7 @@ export default async function TodayPage() {
   const setup = [
     { done: hasDoc("resume"), label: "Upload your resume", href: "/dashboard/settings#documents" },
     { done: hasDoc("linkedin_export"), label: "Add your LinkedIn data export", href: "/dashboard/settings#documents" },
-    { done: ai?.mode !== "starter", label: "Connect your own AI key", href: "/dashboard/settings#ai" },
+    { done: ai?.mode !== "starter" || !!sponsor, label: "Connect your own AI key", href: "/dashboard/settings#ai" },
     { done: jobs.length > 0, label: "Add your first job", href: "/dashboard/jobs" },
     { done: contacts.length > 0, label: "Add someone who could refer you", href: "/dashboard/network" },
   ];
@@ -86,6 +89,22 @@ export default async function TodayPage() {
         {greeting}
         {firstName ? `, ${firstName}` : ""}.
       </h1>
+
+      {sponsor && (
+        <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm">
+          <Sparkles className="size-4" style={{ color: sponsor.brandColor ?? "var(--wing)" }} /> Your AI agents are sponsored by <span className="font-medium">{sponsor.name}</span>
+        </p>
+      )}
+
+      {(pendingIntros ?? 0) > 0 && (
+        <Link href="/dashboard/talent" className="mt-6 flex items-center gap-3 rounded-3xl bg-ink px-5 py-4 text-white hover:opacity-90">
+          <Radar className="size-5 text-offer" />
+          <span className="flex-1 font-medium">
+            {pendingIntros} recruiter{pendingIntros === 1 ? "" : "s"} asked to meet you
+          </span>
+          <ArrowRight className="size-4" />
+        </Link>
+      )}
 
       {inboxCount > 0 && (
         <Link href="/dashboard/jobs" className="mt-6 flex items-center gap-3 rounded-3xl bg-wing px-5 py-4 text-white hover:bg-wing-soft">

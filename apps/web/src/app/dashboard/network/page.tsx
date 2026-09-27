@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { NetworkView } from "@/components/dashboard/NetworkView";
+import type { PacketSummary } from "@/components/dashboard/PacketList";
 import type { ScoutState } from "@/components/dashboard/ReferralScout";
 import { CONNECTION_COLUMNS, isImportRunning, ownCompanyKeysFrom, roleTermsFrom, scoreConnection, type Connection } from "@/lib/agents/referral-scout";
 import { requireUser } from "@/lib/auth";
@@ -7,18 +8,19 @@ import { companyKey, CONTACT_COLUMNS, JOB_COLUMNS, OPEN_STAGES, type Contact, ty
 
 export const metadata: Metadata = { title: "Referrals & network · Offerwing" };
 
-// Drafting a referral ask calls the AI model from a server action on this route.
-export const maxDuration = 60;
+// Drafting a referral ask calls the AI model from a server action on this route; referral packets finish in after().
+export const maxDuration = 300;
 
 export default async function NetworkPage() {
   const { supabase, userId } = await requireUser();
-  const [{ data: contacts }, { data: jobs }, { data: search }, { data: exportDoc }, { data: lastImport }, { data: lastComplete }] = await Promise.all([
+  const [{ data: contacts }, { data: jobs }, { data: search }, { data: exportDoc }, { data: lastImport }, { data: lastComplete }, { data: packets }] = await Promise.all([
     supabase.from("contacts").select(`${CONTACT_COLUMNS}, connection_id`).order("full_name"),
     supabase.from("jobs").select(JOB_COLUMNS),
     supabase.from("search_profiles").select("dream_companies, target_roles").eq("user_id", userId).maybeSingle(),
     supabase.from("career_documents").select("id").eq("kind", "linkedin_export").limit(1).maybeSingle(),
     supabase.from("connection_imports").select("status, error, stats, created_at, completed_at").order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("connection_imports").select("stats, created_at, completed_at").eq("status", "complete").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("referral_packets").select("id, status, referrer_name, views, expires_at, created_at, jobs(title, company)").order("created_at", { ascending: false }).limit(20),
   ]);
   const allJobs = (jobs ?? []) as Job[];
   const openJobs = allJobs.filter((j) => OPEN_STAGES.includes(j.stage));
@@ -68,5 +70,5 @@ export default async function NetworkPage() {
     onList: (contacts ?? []).map((c) => c.connection_id).filter(Boolean) as string[],
   };
 
-  return <NetworkView initialContacts={(contacts ?? []) as Contact[]} jobs={allJobs} dreamCompanies={search?.dream_companies ?? []} scout={scout} />;
+  return <NetworkView initialContacts={(contacts ?? []) as Contact[]} jobs={allJobs} dreamCompanies={search?.dream_companies ?? []} scout={scout} packets={(packets ?? []) as unknown as PacketSummary[]} />;
 }

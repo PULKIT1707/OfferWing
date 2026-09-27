@@ -26,6 +26,7 @@ export function Footer() {
               <li><a href="#extension" className="hover:text-white">Extension</a></li>
               <li><a href="#agents" className="hover:text-white">Agents</a></li>
               <li><a href="#pricing" className="hover:text-white">Pricing</a></li>
+              <li><a href="#teams" className="hover:text-white">For teams</a></li>
             </ul>
           </div>
           <div>

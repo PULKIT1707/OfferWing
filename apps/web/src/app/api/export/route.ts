@@ -7,7 +7,7 @@ export async function GET() {
   const userId = claims?.claims?.sub;
   if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
-  const [profile, search, ai, documents, jobs, contacts, connections, drafts, stories, preps, practice, offers, posts, sources, inbound, plans] = await Promise.all([
+  const [profile, search, ai, documents, jobs, contacts, connections, drafts, stories, preps, practice, offers, posts, sources, inbound, plans, application, packets, talent, memberships, intros] = await Promise.all([
     supabase.from("profiles").select("full_name, alert_alias, created_at").eq("id", userId).single(),
     supabase.from("search_profiles").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("ai_settings").select("mode, provider, key_last4").eq("user_id", userId).maybeSingle(),
@@ -24,6 +24,11 @@ export async function GET() {
     supabase.from("job_sources").select("kind, board_token, company_name, created_at"),
     supabase.from("inbound_emails").select("from_address, subject, kind, jobs_found, received_at"),
     supabase.from("weekly_plans").select("week_start, plan"),
+    supabase.from("application_profiles").select("*").eq("user_id", userId).maybeSingle(),
+    supabase.from("referral_packets").select("status, referrer_name, headline, fit_points, blurb, note_to_referrer, views, expires_at, created_at, jobs(title, company)"),
+    supabase.from("talent_profiles").select("public_id, visible, headline, summary, roles, skills, highlights, availability, hidden_companies, published_at").eq("user_id", userId).maybeSingle(),
+    supabase.from("org_members").select("role, share_progress, joined_at, organizations(name, kind)").eq("user_id", userId),
+    supabase.rpc("my_intro_requests"),
   ]);
 
   const body = {
@@ -45,6 +50,11 @@ export async function GET() {
     job_sources: sources.data,
     inbound_emails: inbound.data,
     weekly_plans: plans.data,
+    application_profile: application.data,
+    referral_packets: packets.data,
+    talent_profile: talent.data,
+    organization_memberships: memberships.data,
+    intro_requests: intros.data,
   };
   return new NextResponse(JSON.stringify(body, null, 2), {
     headers: {

@@ -1,10 +1,13 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { activeSponsor } from "@/lib/orgs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Provider } from "@/lib/onboarding";
 import { UserFacingError } from "./errors";
 
-export type Credential = { source: "starter" | "cloud"; provider: Provider; apiKey: string };
+// Sponsored runs (an outplacement organization's key) are recorded as "cloud": the member's own
+// Starter limits don't apply, and the sponsor controls spend with limits at their AI provider.
+export type Credential = { source: "starter" | "cloud"; provider: Provider; apiKey: string; sponsor?: string };
 
 export const STARTER_DAILY_AUDITS = 2;
 
@@ -26,9 +29,21 @@ export async function resolveCredential(supabase: SupabaseClient, userId: string
     return { source: "cloud", provider: ai.provider as Provider, apiKey: key as string };
   }
 
+  const sponsor = await activeSponsor(supabase, userId);
+  if (sponsor) {
+    const admin = createAdminClient();
+    const { data: key } = admin ? await admin.rpc("get_org_ai_key", { p_org_id: sponsor.orgId }) : { data: null };
+    if (key) return { source: "cloud", provider: sponsor.provider, apiKey: key as string, sponsor: sponsor.name };
+    // Without the service-role key (or a readable sponsor key) we fall back to Starter.
+  }
+
   const starterKey = process.env.OFFERWING_STARTER_ANTHROPIC_API_KEY;
   if (!starterKey) {
-    throw new UserFacingError("Starter credits aren't available right now. Add your own AI key in Settings → AI & keys.");
+    throw new UserFacingError(
+      sponsor
+        ? `${sponsor.name}'s sponsored AI isn't reachable right now. Try again later, or add your own AI key in Settings → AI & keys.`
+        : "Starter credits aren't available right now. Add your own AI key in Settings → AI & keys.",
+    );
   }
   return { source: "starter", provider: "anthropic", apiKey: starterKey };
 }

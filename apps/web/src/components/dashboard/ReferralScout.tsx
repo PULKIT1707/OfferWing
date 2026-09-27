@@ -1,11 +1,12 @@
 "use client";
 
-import { Check, ExternalLink, FileArchive, Loader2, RefreshCw, Search, Send, Sparkles, Trash2, UserPlus, Users } from "lucide-react";
+import { Check, ExternalLink, FileArchive, FileText, Loader2, RefreshCw, Search, Send, Sparkles, Trash2, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { markDraftSent } from "@/app/dashboard/outreach/actions";
 import { addConnectionToList, deleteImportedConnections, draftReferralAsk, searchConnections, startConnectionImport } from "@/app/dashboard/network/scout-actions";
+import { createReferralPacket } from "@/app/dashboard/packets/actions";
 import type { Connection, ReferralDraft, ScoredConnection } from "@/lib/agents/referral-scout";
 import { CopyButton } from "./CopyButton";
 import { Button, Modal } from "./ui";
@@ -82,6 +83,15 @@ function DraftModal({ person, jobs, onClose }: { person: Connection; jobs: { id:
       }
     });
 
+  const packet = () =>
+    start(async () => {
+      if (!jobId) return;
+      setError(undefined);
+      const r = await createReferralPacket(jobId, person.id);
+      if (r.error) setError(r.error);
+      else if (r.id) router.push(`/dashboard/packets/${r.id}`);
+    });
+
   const markSent = () =>
     start(async () => {
       if (!draftId) return;
@@ -135,6 +145,13 @@ function DraftModal({ person, jobs, onClose }: { person: Connection; jobs: { id:
                 <Button onClick={markSent} disabled={pending || !draftId} className="flex-1"><Send className="size-4" /> I sent it</Button>
               )}
             </div>
+            {jobId && (
+              <div className="rounded-2xl border border-dashed border-line p-4">
+                <p className="text-sm font-medium">Make it easy for {person.full_name.split(" ")[0]} to say yes</p>
+                <p className="mt-1 text-xs text-muted">A one-page link with why you fit, a blurb for their referral form and your tailored resume. Paste it into your message.</p>
+                <Button variant="ghost" className="mt-3 w-full" disabled={pending} onClick={packet}><FileText className="size-4" /> Create a referral packet</Button>
+              </div>
+            )}
             <button onClick={generate} disabled={pending} className="w-full text-center text-xs text-muted hover:text-wing">Rewrite</button>
           </>
         )}

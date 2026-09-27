@@ -10,6 +10,9 @@ const LABEL: Record<AgentName, string> = {
   comment_ideas: "comment suggestions",
   story_bank: "story bank builds",
   weekly_plan: "weekly plans",
+  form_answers: "application answer drafts",
+  referral_packet: "referral packets",
+  talent_profile: "talent profile builds",
 };
 
 // The user's AI credential for an agent run, or a friendly error (no key / Starter limit reached).

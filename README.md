@@ -35,12 +35,15 @@ AI job-search agents for LinkedIn users. Offerwing audits your profile, scores j
 | Jobs pipeline | `/dashboard/jobs` | An **Inbox** of newly discovered jobs (from forwarded LinkedIn alerts and followed careers pages) above a kanban board. **Job Match** scores fit, lists requirements you meet (with evidence) and gaps, flags preference conflicts and ghost-job signals, and recommends how to apply. |
 | Application kit | `/dashboard/jobs/[id]/kit` | **Application Tailor** writes a job-specific resume (downloadable as `.docx`), cover note, LinkedIn connection note and screening answers. A **truthfulness check** flags anything it can't trace back to your documents. |
 | Referrals & network | `/dashboard/network` | Import your LinkedIn data export ZIP. **Referral Scout** ranks connections at each target company and drafts referral asks. |
+| Referral packets | `/dashboard/packets/[id]`, public `/r/[token]` | A one-page, unlisted link for someone who might refer you: why you fit (each reason traced to your documents), a blurb for their referral tool and your tailored resume. Created from an application kit or a referral ask; view counts; expires after 30 days or when you turn it off. The page carries an Offerwing sign-up link. |
+| Get discovered | `/dashboard/talent` | An opt-in, anonymous, fact-checked profile for the **talent marketplace**. Verified recruiting teams search it and send intro requests; accepting shares your contact details with that team and adds the role to your pipeline. Hidden from companies you list (your current employer by default). |
 | Outreach | `/dashboard/outreach` | Follow-ups due (max two per person), people to ask for referrals, connection notes for recruiters and hiring managers, a weekly invite budget and recent drafts. You send everything yourself. |
 | Content | `/dashboard/content` | A two-week post plan, drafts in your voice with alternative hooks, "Open in LinkedIn" pre-filled posts and comment ideas for posts you paste. |
 | Interviews & offers | `/dashboard/interviews` | A STAR story bank built from your resume, per-job prep packs (with web research on Anthropic), practice feedback, offer comparison and negotiation plans. |
 | Insights | `/dashboard/insights` | Pipeline and activity metrics. |
-| Settings | `/dashboard/settings` | Job sources (alert forwarding address and followed careers pages), AI mode and provider key, export all your data as JSON, delete your account. |
-| Browser extension | `apps/extension` | Chrome side panel on LinkedIn job, profile and company pages: fit score, who you know, save to pipeline, screening answers. Reads a page only when you click. |
+| Settings | `/dashboard/settings` | Application details (what forms ask for), job sources (alert forwarding address and followed careers pages), AI mode and provider key, outplacement program sharing, export all your data as JSON, delete your account. |
+| Organizations | `/org`, `/org/[id]`, `/join/[code]` | **Outplacement**: an employer invites leavers with seat-limited invite links, sponsors their AI with its own key (Vault), brands the experience and sees program totals (only once 5 people join) plus individual progress for people who opt in. **Recruiting**: a team Offerwing has verified searches the talent marketplace and sends intro requests. |
+| Browser extension | `apps/extension` | Chrome side panel on LinkedIn job, profile and company pages: fit score, who you know, save to pipeline, screening answers. On application forms (Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Workable, or any site after a one-time permission) it **fills the form** from your application details, the job's kit and your resume, drafts answers to open questions, and marks the job applied. It never submits, and never touches demographic or consent questions. Reads a page only when you click. |
 
 ## Tech stack
 
@@ -220,13 +223,20 @@ All user tables have `user_id` and **row-level security** limiting access to `au
 | `job_sources`, `inbound_emails` | Followed careers pages, and metadata (sender, subject, jobs found) of forwarded alert emails. Email bodies are never stored. |
 | `stories`, `interview_preps`, `practice_answers`, `offers` | STAR story bank, prep packs, practice feedback, offers with negotiation plans. |
 | `content_posts`, `weekly_plans`, `agent_runs` | Post ideas and drafts, Career Coach plans, and a run log used for Starter limits. |
+| `application_profiles` | Contact details, links, current role and countries the user can work in, for filling application forms. No demographic data. |
+| `referral_packets` | Referral packet content, an unguessable `token`, status (`generating` → `draft` → `live` / `revoked`), view counts and expiry. Users can't change the token or views. |
+| `organizations`, `org_members`, `org_invites` | Outplacement programs and recruiting teams, membership roles (`owner` / `admin` / `member`, plus each member's `share_progress` choice) and invite links. `seat_limit`, `sponsorship_ends_at` and `verified` are set by Offerwing staff (service role) only; the Vault secret id is not selectable by users. |
+| `talent_profiles`, `intro_requests` | Anonymous marketplace profiles (with a public id, never the user id) and recruiter intro requests. All intro writes go through functions. |
 
 Security-definer functions:
 
 - `set_ai_mode(mode, provider)` and `set_cloud_ai_key(provider, key)` write to `ai_settings` and to **Vault** (`vault.create_secret` / `update_secret`). Switching away from cloud mode deletes the secret immediately.
 - `get_user_ai_key(user_id)` reads from `vault.decrypted_secrets`. It can only be executed by the service role, and the key is only ever held in server memory for the length of a call.
 - `purge_stale_data()` (service role only, run daily by `/api/cron/cleanup`) deletes imported connections not re-imported within 90 days unless they're on a referral list, and inbound email records after 30 days.
-- `delete_my_account()` removes the user's Vault secrets and their `auth.users` row, and all their data is removed by cascade. The Settings action deletes their uploaded files from Storage first.
+- `delete_my_account()` removes the user's Vault secrets, any organizations they solely own (with their Vault keys), and their `auth.users` row, and all their data is removed by cascade. The Settings action deletes their uploaded files from Storage first.
+- Referral packets: `get_referral_packet(token)`, `get_referral_packet_resume(token)` and `record_referral_packet_view(token)` are callable without signing in but return only live, unexpired packets, and never the job description or user id.
+- Organizations: `create_organization`, `redeem_org_invite` (seat limit, one sponsor per person), `get_invite_preview` (anonymous), `set_org_ai_key` / `remove_org_ai_key` (admins; Vault), `get_org_ai_key` (service role only), `org_member_list` and `org_progress` (admins; totals only at 5+ members, individual rows only for members sharing progress). `is_org_member` / `is_org_admin` back the RLS policies.
+- Marketplace: `search_talent` and `request_intro` (verified recruiting teams only; profiles hidden from matching company names are skipped; 25 intros a day per team), `withdraw_intro`, `respond_intro` (the candidate; accepting creates a pipeline job), `org_intros` (contact details only for accepted intros) and `my_intro_requests`. `company_key()` mirrors `companyKey()` in `lib/dashboard.ts`.
 
 Privacy choices built into the code:
 
@@ -252,6 +262,10 @@ Each agent lives in `src/lib/agents/` as a system prompt, a context builder, a Z
 | Negotiation | `negotiation.ts` | premium | Assessment, leverage, a concrete ask, email script, call points and fallbacks. No invented competing offers. |
 | Content | `content.ts` | standard / fast | Two-week plan, post drafts in the user's voice, comment ideas; discreet in stealth mode |
 | Career Coach | `coach.ts` | standard | A weekly plan with 4–6 prioritized actions from a snapshot of the user's search |
+| Application autofill | `lib/autofill.ts` (+ `extension/src/lib/form.ts`) | — (deterministic) | Recognizes ATS pages, classifies form fields, plans values from application details, preferences and the kit's answers; skips demographic and consent questions and never overwrites typed values |
+| Application answers | `form-answers.ts` | standard | Drafts answers to a form's open questions from the user's documents; multiple-choice answers must match an option; unknowns become `[placeholders]` and are left unticked for review |
+| Referral packet | `referral-packet.ts` | standard | Headline, 3–5 fit points each with an evidence quote (untraceable ones are removed), a referral-form blurb and a note to the referrer |
+| Talent profile | `talent-profile.ts`, `lib/talent.ts` | standard | Anonymous headline, summary, skills (only ones in the documents) and evidence-backed highlights; names, employers, schools, emails, phones and links are redacted deterministically afterwards |
 
 **No-fabrication rule.** Prompts tell models to use only facts in the user's documents. Where a fact is missing, they insert a `[placeholder]` and list it in `needs_input`, rather than guessing.
 
@@ -263,9 +277,10 @@ Users choose how AI is powered during onboarding and can change it any time in S
 |---|---|---|
 | **Starter** (default) | Offerwing's `OFFERWING_STARTER_ANTHROPIC_API_KEY` | Daily limits per user, e.g. **2** profile audits, **20** job matches, **5** application kits, **20** outreach drafts, **5** prep packs, **3** content plans, **3** weekly plans (see `lib/llm/quota.ts` and each agent module) |
 | **Always-on** (`cloud`) | User's own OpenAI / Anthropic / Gemini key, encrypted in Supabase Vault | Unlimited, limited only by the user's own provider account |
-| **Private** | User's key kept only in the browser extension | Job scoring runs in the extension, straight from the browser to the provider. Web-only agents explain that they need Starter or Always-on. |
+| **Private** | User's key kept only in the browser extension | Job scoring and form-answer drafts run in the extension, straight from the browser to the provider. Web-only agents explain that they need Starter or Always-on. |
+| **Sponsored** | An outplacement organization's key, encrypted in Vault | Applies to Starter-mode members of an active outplacement program. Recorded as `cloud` runs, so Starter limits don't apply; the sponsor controls spend with limits at its provider. Needs `SUPABASE_SERVICE_ROLE_KEY`. |
 
-`resolveCredential()` in [`lib/llm/credentials.ts`](apps/web/src/lib/llm/credentials.ts) picks the key for each run from the user's mode.
+`resolveCredential()` in [`lib/llm/credentials.ts`](apps/web/src/lib/llm/credentials.ts) picks the key for each run from the user's mode (own cloud key, then sponsor, then Starter).
 
 ## Routes
 
@@ -280,7 +295,10 @@ Users choose how AI is powered during onboarding and can change it any time in S
 | `GET /api/export` | Route handler | Downloads all user data as JSON |
 | `GET /api/kits/[id]/resume` | Route handler | Downloads a tailored resume as `.docx` (RLS-scoped) |
 | `/extension/connect` | Page (protected) | Hands the session to the pinned extension ID after the user clicks Connect |
-| `/api/ext/*` | Route handlers | Extension API (`me`, `lookup`, `jobs`, `context`, `matches`, `contacts`), authenticated with the user's Bearer token; RLS applies |
+| `/api/ext/*` | Route handlers | Extension API (`me`, `lookup`, `jobs`, `context`, `matches`, `contacts`, `autofill`, `resume`, `form-answers`, `applied`), authenticated with the user's Bearer token; RLS applies |
+| `/r/[token]`, `GET /r/[token]/resume` | Page, route handler (public) | Referral packet and its tailored resume; `noindex`; link-preview bots aren't counted as views |
+| `/org`, `/org/[id]` | Pages (protected) | Organization console (doesn't require job-seeker onboarding) |
+| `/join/[code]` | Page (public) | Invite preview; signed-in users accept, others sign up or log in first |
 | `POST /api/inbound/email` | Route handler | Inbound-email webhook (Postmark JSON or SendGrid form posts), protected by `INBOUND_EMAIL_SECRET` |
 | `GET /api/cron/discovery`, `/api/cron/cleanup` | Route handlers | Scheduled in `apps/web/vercel.json`, protected by `CRON_SECRET` |
 | `/privacy`, `/terms` | Pages | Drafts for legal review |
@@ -323,14 +341,16 @@ Any Node host that runs `next start` also works, but `after()` needs a runtime t
 
 ## Roadmap
 
-Built: onboarding, profile audit, job discovery inbox (alert emails and careers pages), pipeline with fit scoring, application kits with `.docx` resumes and truthfulness checks, Referral Scout, outreach queue, content, interview prep and practice, offers and negotiation, Career Coach weekly plans, the Chrome extension with Private mode, data export, account deletion and retention jobs.
+Built: onboarding, profile audit, job discovery inbox (alert emails and careers pages), pipeline with fit scoring, application kits with `.docx` resumes and truthfulness checks, Referral Scout, referral packets, outreach queue, content, interview prep and practice, offers and negotiation, Career Coach weekly plans, the Chrome extension with Private mode and application autofill, outplacement programs, the opt-in talent marketplace, data export, account deletion and retention jobs.
 
 Before launch:
 
 - A **live run** of every agent with a real AI key, then prompt tuning on real output.
 - Try the extension on **real LinkedIn pages** and adjust the page-reading rules.
 - Configure Google / LinkedIn sign-in, a production email sender, the inbound-email provider, and deployment.
-- Legal review of `/privacy` and `/terms`; Chrome Web Store submission.
+- Legal review of `/privacy` and `/terms` (they don't yet cover organizations, sponsorship, referral packets or the marketplace); Chrome Web Store submission (the extension now asks for ATS host permissions and optional per-site access).
+- Try autofill on **real ATS forms** (Workday's multi-step forms and custom dropdowns especially).
+- A staff process (or admin tool) for verifying recruiting teams and setting outplacement seats and sponsorship dates; today that's done in SQL with the service role.
 - Observability (error tracking, AI spend per user) and evals for each agent.
 
 ## License

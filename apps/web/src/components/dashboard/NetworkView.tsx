@@ -4,6 +4,7 @@ import { Building2, ExternalLink, Plus, Search, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { labelOf, OPEN_STAGES, REFERRAL_STATUSES, RELATIONSHIPS, sameCompany, today, type Contact, type Job } from "@/lib/dashboard";
 import { ContactForm } from "./ContactForm";
+import { PacketList, type PacketSummary } from "./PacketList";
 import { ReferralScout, type ScoutState } from "./ReferralScout";
 import { Button, Card, EmptyState, Modal, PageHeader } from "./ui";
 
@@ -22,7 +23,7 @@ const RELATIONSHIP_WEIGHT: Record<Contact["relationship"], number> = {
 };
 const rank = (c: Contact) => c.strength * 2 + RELATIONSHIP_WEIGHT[c.relationship];
 
-export function NetworkView({ initialContacts, jobs, dreamCompanies, scout }: { initialContacts: Contact[]; jobs: Job[]; dreamCompanies: string[]; scout: ScoutState }) {
+export function NetworkView({ initialContacts, jobs, dreamCompanies, scout, packets }: { initialContacts: Contact[]; jobs: Job[]; dreamCompanies: string[]; scout: ScoutState; packets: PacketSummary[] }) {
   const [contacts, setContacts] = useState(initialContacts);
   // Adopt fresh server data (e.g. after Referral Scout adds someone) while keeping local edits snappy.
   const [prevInitial, setPrevInitial] = useState(initialContacts);
@@ -64,6 +65,7 @@ export function NetworkView({ initialContacts, jobs, dreamCompanies, scout }: { 
       />
 
       <ReferralScout state={scout} />
+      <PacketList packets={packets} />
 
       {targets.length > 0 && scout.lastImport?.status !== "complete" && (
         <section className="mb-10">

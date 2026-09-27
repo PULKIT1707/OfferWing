@@ -6,7 +6,10 @@ import { deleteAccount } from "@/app/dashboard/actions";
 import { inputClass } from "@/components/onboarding/fields";
 import { AiStep, DocumentsStep } from "@/components/onboarding/steps-setup";
 import { CareerStep, LinkedinStep, PreferencesStep } from "@/components/onboarding/steps-profile";
+import type { ApplicationProfile } from "@/lib/application-profile";
 import type { AiSettings, CareerDocument, SearchProfile } from "@/lib/onboarding";
+import { ApplicationProfileForm } from "./ApplicationProfileForm";
+import { SponsorSettings, type SponsorMembership } from "./SponsorSettings";
 import { JobSources, type InboundEmailRow, type JobSource } from "./JobSources";
 import { Button } from "./ui";
 
@@ -76,6 +79,8 @@ export function SettingsView({
   alertAddress,
   jobSources,
   inboundEmails,
+  application,
+  sponsorships,
 }: {
   userId: string;
   profile: SearchProfile;
@@ -84,6 +89,8 @@ export function SettingsView({
   alertAddress: string;
   jobSources: JobSource[];
   inboundEmails: InboundEmailRow[];
+  application: ApplicationProfile;
+  sponsorships: SponsorMembership[];
 }) {
   const [profile, setProfile] = useState(initialProfile);
   const [ai, setAi] = useState(initialAi);
@@ -96,7 +103,9 @@ export function SettingsView({
 
   const nav = [
     ["#search", "Job search"],
+    ...(sponsorships.length ? [["#sponsor", "Program"]] : []),
     ["#linkedin", "LinkedIn"],
+    ["#applications", "Applications"],
     ["#sources", "Job sources"],
     ["#ai", "AI & keys"],
     ["#documents", "Documents"],
@@ -125,6 +134,9 @@ export function SettingsView({
         <Section id="linkedin" title="LinkedIn" subtitle="Your plan, target companies and writing samples." saved={saved === "linkedin"}>
           <LinkedinStep embedded profile={profile} onDone={onProfile("linkedin")} />
         </Section>
+        <Section id="applications" title="Application details" subtitle="What job application forms ask for. The extension fills these in; you review and submit." saved={saved === "applications"}>
+          <ApplicationProfileForm initial={application} onSaved={() => flag("applications")} />
+        </Section>
         <Section id="sources" title="Job sources" subtitle="Where new jobs come from. Everything lands in your pipeline inbox.">
           <JobSources alertAddress={alertAddress} sources={jobSources} emails={inboundEmails} />
         </Section>
@@ -142,6 +154,11 @@ export function SettingsView({
         >
           <AiStep embedded ai={ai} onAi={setAi} onDone={() => flag("ai")} />
         </Section>
+        {sponsorships.length > 0 && (
+          <Section id="sponsor" title="Outplacement program" subtitle="An employer is supporting your job search.">
+            <SponsorSettings memberships={sponsorships} />
+          </Section>
+        )}
         <Section id="documents" title="Documents" subtitle="Your resume and LinkedIn files. Changes save instantly.">
           <DocumentsStep embedded userId={userId} documents={docs} onDocuments={setDocs} onDone={() => {}} />
         </Section>

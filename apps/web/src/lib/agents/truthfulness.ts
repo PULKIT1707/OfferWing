@@ -25,20 +25,48 @@ function numbersIn(s: string): string[] {
   return [...withoutPlaceholders.matchAll(/\d[\d,]*(?:\.\d+)?/g)].map((m) => m[0].replace(/,/g, ""));
 }
 
-export function verifyKit(kit: ApplicationKit, sourceText: string): Verification {
+// Checks against one set of source documents, reused by every agent that makes claims about the user.
+export function sourceChecker(sourceText: string) {
   const source = normalize(sourceText);
   const sourceStemmed = stemmed(sourceText);
   const sourceWords = new Set(words(sourceText));
   const sourceNumbers = new Set(numbersIn(sourceText));
-
-  const supported = (quote: string) => {
-    const q = normalize(quote);
-    if (q.length < 8) return false;
-    if (source.includes(q)) return true;
-    const w = words(quote);
-    return w.length > 0 && w.filter((x) => sourceWords.has(x)).length / w.length >= 0.85;
+  return {
+    source,
+    // A quote counts as supported when it appears verbatim, or 85% of its words do.
+    supported: (quote: string) => {
+      const q = normalize(quote);
+      if (q.length < 8) return false;
+      if (source.includes(q)) return true;
+      const w = words(quote);
+      return w.length > 0 && w.filter((x) => sourceWords.has(x)).length / w.length >= 0.85;
+    },
+    inventedNumbers: (text: string) => numbersIn(text).filter((n) => !sourceNumbers.has(n)),
+    skillFound: (skill: string) => sourceStemmed.includes(stemmed(skill)),
   };
-  const inventedNumbers = (text: string) => numbersIn(text).filter((n) => !sourceNumbers.has(n));
+}
+
+// Claims backed by a quote (fit points, highlights) plus free text that must not add numbers.
+export function verifyClaims(claims: { where: string; text: string; evidence: string }[], texts: { where: string; text: string }[], sourceText: string): Verification {
+  const { supported, inventedNumbers } = sourceChecker(sourceText);
+  const flagged: Flag[] = [];
+  const numberReason = (text: string) => {
+    const n = inventedNumbers(text);
+    return n.length ? [`Number${n.length > 1 ? "s" : ""} not in your documents: ${n.join(", ")}`] : [];
+  };
+  for (const c of claims) {
+    const reasons = [...(supported(c.evidence) ? [] : ["Supporting quote not found in your documents"]), ...numberReason(c.text)];
+    if (reasons.length) flagged.push({ where: c.where, text: c.text, reasons });
+  }
+  for (const t of texts) {
+    const reasons = numberReason(t.text);
+    if (reasons.length) flagged.push({ where: t.where, text: t.text, reasons });
+  }
+  return { checked: claims.length + texts.length, flagged, unverified_skills: [] };
+}
+
+export function verifyKit(kit: ApplicationKit, sourceText: string): Verification {
+  const { source, supported, inventedNumbers, skillFound } = sourceChecker(sourceText);
 
   const flagged: Flag[] = [];
   let checked = 0;
@@ -71,6 +99,6 @@ export function verifyKit(kit: ApplicationKit, sourceText: string): Verification
     check(where, text, numbers.length ? [`Number${numbers.length > 1 ? "s" : ""} not in your documents: ${numbers.join(", ")}`] : []);
   }
 
-  const unverified_skills = kit.resume.skills.filter((s) => !sourceStemmed.includes(stemmed(s)) && !supported(s));
+  const unverified_skills = kit.resume.skills.filter((s) => !skillFound(s) && !supported(s));
   return { checked, flagged, unverified_skills };
 }

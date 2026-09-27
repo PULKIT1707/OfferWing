@@ -1,6 +1,7 @@
 import { Agents } from "@/components/landing/Agents";
 import { Extension } from "@/components/landing/Extension";
 import { Faq } from "@/components/landing/Faq";
+import { ForTeams } from "@/components/landing/ForTeams";
 import { Features } from "@/components/landing/Features";
 import { Footer } from "@/components/landing/Footer";
 import { Hero } from "@/components/landing/Hero";
@@ -22,6 +23,7 @@ export default function Home() {
       <Trust />
       <Agents />
       <Pricing />
+      <ForTeams />
       <Faq />
       <Footer />
     </main>

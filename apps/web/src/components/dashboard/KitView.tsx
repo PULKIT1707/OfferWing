@@ -1,10 +1,11 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, Download, FileText, Loader2, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Download, FileText, Loader2, RefreshCw, Share2, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { startApplicationKit } from "@/app/dashboard/jobs/kit-actions";
+import { createReferralPacket } from "@/app/dashboard/packets/actions";
 import type { ApplicationKit } from "@/lib/agents/application-tailor";
 import type { Verification } from "@/lib/agents/truthfulness";
 import { CopyButton } from "./CopyButton";
@@ -146,6 +147,14 @@ export function KitView({ job, run, running }: { job: { id: string; title: strin
   const [error, setError] = useState<string>();
   const kit = run?.status === "complete" ? run.result : null;
 
+  const share = () =>
+    start(async () => {
+      setError(undefined);
+      const r = await createReferralPacket(job.id, null);
+      if (r.error) setError(r.error);
+      else if (r.id) router.push(`/dashboard/packets/${r.id}`);
+    });
+
   const generate = () =>
     start(async () => {
       setError(undefined);
@@ -169,6 +178,9 @@ export function KitView({ job, run, running }: { job: { id: string; title: strin
           <div className="flex gap-2">
             <Button variant="ghost" onClick={generate} disabled={pending}>
               {pending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Re-tailor
+            </Button>
+            <Button variant="ghost" onClick={share} disabled={pending} title="A one-page link for someone who could refer you">
+              <Share2 className="size-4" /> Referral packet
             </Button>
             <a href={`/api/kits/${run!.id}/resume`} className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-wing px-4 py-2.5 text-sm font-medium text-white hover:bg-wing-soft">
               <Download className="size-4" /> Resume (.docx)

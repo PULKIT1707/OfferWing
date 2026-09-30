@@ -223,11 +223,10 @@ export function AiStep({ ai, onAi, onDone, onBack, embedded }: Nav & { ai: AiSet
   );
 }
 
-export function ConnectStep({ alertAlias, onBack }: { alertAlias: string; onBack: () => void }) {
+export function ConnectStep({ address, onBack }: { address: string; onBack: () => void }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
-  const address = `${alertAlias}@alerts.offerwing.ai`;
 
   return (
     <form onSubmit={(ev) => { ev.preventDefault(); start(async () => { const r = await finishOnboarding(); if (r?.error) setError(r.error); }); }}>
@@ -260,7 +259,7 @@ export function ConnectStep({ alertAlias, onBack }: { alertAlias: string; onBack
           <div className="flex items-center gap-2">
             <p className="font-medium">Install the browser extension</p>
           </div>
-          <p className="mt-1 text-sm text-muted">Fit scores, referral paths and one-click saving right beside LinkedIn, only when you click. After installing, connect it at offerwing.ai/extension/connect.</p>
+          <p className="mt-1 text-sm text-muted">Fit scores, referral paths and one-click saving right beside LinkedIn, only when you click. After installing, connect it at offerwing.app/extension/connect.</p>
         </div>
       </div>
       <StepFooter busy={pending} error={error} onBack={onBack} label="Go to my dashboard" />

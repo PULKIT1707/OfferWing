@@ -34,7 +34,7 @@ export function Footer() {
             <ul className="mt-4 space-y-2 text-sm text-white/60">
               <li><a href="/privacy" className="hover:text-white">Privacy</a></li>
               <li><a href="/terms" className="hover:text-white">Terms</a></li>
-              <li><a href="mailto:hello@offerwing.ai" className="hover:text-white">Contact</a></li>
+              <li><a href="mailto:hello@offerwing.app" className="hover:text-white">Contact</a></li>
             </ul>
           </div>
         </div>

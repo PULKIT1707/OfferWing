@@ -69,7 +69,7 @@ export default function PrivacyPage() {
       </p>
 
       <h2>Contact</h2>
-      <p>Questions or requests: <a href="mailto:privacy@offerwing.ai">privacy@offerwing.ai</a>.</p>
+      <p>Questions or requests: <a href="mailto:privacy@offerwing.app">privacy@offerwing.app</a>.</p>
     </>
   );
 }

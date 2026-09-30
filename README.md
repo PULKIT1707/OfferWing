@@ -162,7 +162,7 @@ Set these in `apps/web/.env.local`. It's gitignored; never commit it.
 | `OFFERWING_STARTER_ANTHROPIC_API_KEY` | For Starter mode | Offerwing's own Anthropic key that powers free Starter usage, within the daily limits below. |
 | `NEXT_PUBLIC_EXTENSION_ID` | For the extension | The only extension ID `/extension/connect` will hand a session to. The dev build's ID is fixed by the manifest `key`: `mgoonaiikahlemfjhcdgpdgjmkjjbmbc`. |
 | `INBOUND_EMAIL_SECRET` | For alert forwarding | Shared secret your inbound-email provider sends as `?secret=` when it POSTs to `/api/inbound/email`. |
-| `ALERT_EMAIL_DOMAIN` | No | Domain of users' alert addresses. Default `alerts.offerwing.ai`. |
+| `ALERT_EMAIL_DOMAIN` | No | Domain of users' alert addresses. Default `alerts.offerwing.app`. |
 | `CRON_SECRET` | For scheduled jobs | Vercel Cron sends it as `Authorization: Bearer …` to `/api/cron/*`. |
 | `OFFERWING_<PROVIDER>_MODEL_<TIER>` | No | Overrides the default model for one provider and tier, e.g. `OFFERWING_OPENAI_MODEL_PREMIUM=gpt-5`. Provider: `ANTHROPIC`, `OPENAI` or `GEMINI`. Tier: `PREMIUM`, `STANDARD` or `FAST`. |
 

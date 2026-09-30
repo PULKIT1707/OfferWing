@@ -48,7 +48,7 @@ export default function TermsPage() {
       <p>We&apos;ll post updates here and tell you about material changes before they take effect.</p>
 
       <h2>Contact</h2>
-      <p><a href="mailto:hello@offerwing.ai">hello@offerwing.ai</a></p>
+      <p><a href="mailto:hello@offerwing.app">hello@offerwing.app</a></p>
     </>
   );
 }

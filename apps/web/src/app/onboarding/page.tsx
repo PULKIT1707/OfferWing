@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Wizard } from "@/components/onboarding/Wizard";
+import { ALERT_DOMAIN } from "@/lib/discovery";
 import { STEPS, withDefaults, type AiSettings, type CareerDocument, type StepId } from "@/lib/onboarding";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,7 +31,7 @@ export default async function OnboardingPage() {
     <Wizard
       userId={userId}
       firstName={profile.full_name?.split(" ")[0] ?? null}
-      alertAlias={profile.alert_alias}
+      alertAddress={`${profile.alert_alias}@${ALERT_DOMAIN()}`}
       initialStep={step}
       initialProfile={initialProfile}
       initialAi={(ai ?? { mode: "starter", provider: null, key_last4: null }) as AiSettings}

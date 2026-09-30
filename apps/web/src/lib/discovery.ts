@@ -14,7 +14,7 @@ export type DiscoveredJob = {
   source: "alert" | "ats";
 };
 
-export const ALERT_DOMAIN = () => process.env.ALERT_EMAIL_DOMAIN ?? "alerts.offerwing.ai";
+export const ALERT_DOMAIN = () => process.env.ALERT_EMAIL_DOMAIN ?? "alerts.offerwing.app";
 
 // Adds new jobs to the user's inbox ("discovered"), skipping ones already known (by source ID or URL)
 // and companies on their avoid list. Returns how many were added.

@@ -3,7 +3,7 @@ import { ingestInboundEmail, type InboundEmail } from "@/lib/discovery";
 import { secretMatches } from "@/lib/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// Receives emails sent to users' alert addresses (<alias>@alerts.offerwing.ai) from an inbound-email
+// Receives emails sent to users' alert addresses (<alias>@alerts.offerwing.app) from an inbound-email
 // provider. Supports Postmark-style JSON and SendGrid-style multipart form posts.
 // Configure the provider to POST to /api/inbound/email?secret=<INBOUND_EMAIL_SECRET>.
 

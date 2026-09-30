@@ -12,14 +12,14 @@ import { CareerStep, LinkedinStep, PreferencesStep } from "./steps-profile";
 type Props = {
   userId: string;
   firstName: string | null;
-  alertAlias: string;
+  alertAddress: string;
   initialStep: StepId;
   initialProfile: SearchProfile;
   initialAi: AiSettings;
   initialDocuments: CareerDocument[];
 };
 
-export function Wizard({ userId, firstName, alertAlias, initialStep, initialProfile, initialAi, initialDocuments }: Props) {
+export function Wizard({ userId, firstName, alertAddress, initialStep, initialProfile, initialAi, initialDocuments }: Props) {
   const [step, setStep] = useState<StepId>(initialStep);
   const [furthest, setFurthest] = useState(STEPS.findIndex((s) => s.id === initialStep));
   const [profile, setProfile] = useState(initialProfile);
@@ -94,7 +94,7 @@ export function Wizard({ userId, firstName, alertAlias, initialStep, initialProf
           {step === "linkedin" && <LinkedinStep profile={profile} onDone={next} onBack={back} />}
           {step === "documents" && <DocumentsStep userId={userId} documents={documents} onDocuments={setDocuments} onDone={() => next()} onBack={back} />}
           {step === "ai" && <AiStep ai={ai} onAi={setAi} onDone={() => next()} onBack={back} />}
-          {step === "connect" && <ConnectStep alertAlias={alertAlias} onBack={back} />}
+          {step === "connect" && <ConnectStep address={alertAddress} onBack={back} />}
         </div>
       </main>
     </div>

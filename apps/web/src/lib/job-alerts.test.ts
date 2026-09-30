@@ -55,8 +55,8 @@ describe("inbound helpers", () => {
     expect(r).toEqual({ code: "123456789", link: "https://mail-settings.google.com/mail/vf-%5BABC%5D-123" });
   });
   it("finds the alias among recipients", () => {
-    expect(alertAliasFrom(["Me <me@gmail.com>", "2c754a8d65@alerts.offerwing.ai"], "alerts.offerwing.ai")).toBe("2c754a8d65");
-    expect(alertAliasFrom(["2C754A8D65+tag@Alerts.Offerwing.ai"], "alerts.offerwing.ai")).toBe("2c754a8d65");
-    expect(alertAliasFrom(["x@other.com"], "alerts.offerwing.ai")).toBeNull();
+    expect(alertAliasFrom(["Me <me@gmail.com>", "2c754a8d65@alerts.offerwing.app"], "alerts.offerwing.app")).toBe("2c754a8d65");
+    expect(alertAliasFrom(["2C754A8D65+tag@Alerts.Offerwing.app"], "alerts.offerwing.app")).toBe("2c754a8d65");
+    expect(alertAliasFrom(["x@other.com"], "alerts.offerwing.app")).toBeNull();
   });
 });

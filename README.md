@@ -326,7 +326,7 @@ The app is built for **Vercel**:
 2. Add the environment variables above for Production (and Preview if you use it).
 3. In Supabase → Auth → URL Configuration, add your production URL and `https://<your-domain>/auth/callback`.
 4. Agent routes use `maxDuration = 300`. Check that your Vercel plan allows functions to run that long, or lower it.
-5. **Scheduled jobs:** `apps/web/vercel.json` runs `/api/cron/discovery` every 6 hours and `/api/cron/cleanup` daily. Set `CRON_SECRET` and `SUPABASE_SERVICE_ROLE_KEY`.
+5. **Scheduled jobs:** `apps/web/vercel.json` runs `/api/cron/discovery` daily at 07:00 UTC (Vercel Hobby only allows daily crons; on Pro it can run every 6 hours) and `/api/cron/cleanup` daily. Set `CRON_SECRET` and `SUPABASE_SERVICE_ROLE_KEY`.
 6. **Alert forwarding:** point an inbound-email provider (for example Postmark inbound, or SendGrid Inbound Parse) at `https://<your-domain>/api/inbound/email?secret=<INBOUND_EMAIL_SECRET>`, and add an MX record for `alerts.<your-domain>` as the provider instructs. Users' addresses are `<alert_alias>@alerts.<your-domain>`.
 7. **Extension:** build with `OFFERWING_APP_URL=https://<your-domain> npm run build` in `apps/extension`, and publish it on the Chrome Web Store.
 

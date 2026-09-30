@@ -3,3 +3,5 @@ node_modules/
 .env
 .env.*
 !.env.example
+# Public build-time values only (safe in the browser); secrets go in Vercel env vars.
+!.env.production

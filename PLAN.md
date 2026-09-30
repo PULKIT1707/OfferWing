@@ -619,7 +619,7 @@ Every agent in the plan, the B2B additions below, and both surfaces (web app and
 | A0 Career Coach | Weekly plan on Today (`lib/agents/coach.ts`) |
 | A1 Knowledge base | Cached document text plus STAR story bank (`stories`) |
 | A2 Profile Optimizer | Profile health audit |
-| A3 Job Discovery | Inbox from forwarded alert emails and Greenhouse / Lever / Ashby boards, cron every 6 hours |
+| A3 Job Discovery | Inbox from forwarded alert emails and Greenhouse / Lever / Ashby boards, daily cron (every 6 hours once on Vercel Pro) |
 | A4 Job Match | Fit scoring (server, or in the extension for Private mode) |
 | A5 Application Tailoring | Application kits with truthfulness check and `.docx` resume |
 | A6 Company Research | Company brief inside interview prep packs (web search on Anthropic) |

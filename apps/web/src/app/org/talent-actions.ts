@@ -10,7 +10,7 @@ export type TalentResult = {
   headline: string | null;
   summary: string | null;
   roles: string[];
-  seniority: string | null;
+  seniority: string[];
   years_experience: number | null;
   industries: string[];
   locations: string[];

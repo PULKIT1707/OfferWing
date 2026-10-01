@@ -7,7 +7,7 @@ import { useEffect, useState, useTransition } from "react";
 import { buildTalentProfile, deleteTalentProfile, respondToIntro, saveTalentProfile, setTalentVisibility, type TalentEdit } from "@/app/dashboard/talent/actions";
 import { ChipInput, inputClass } from "@/components/onboarding/fields";
 import type { Verification } from "@/lib/agents/truthfulness";
-import { SENIORITY } from "@/lib/onboarding";
+import { seniorityLabel } from "@/lib/onboarding";
 import { AVAILABILITY } from "@/lib/talent";
 import { Button, PageHeader } from "./ui";
 
@@ -18,7 +18,7 @@ export type TalentRow = {
   headline: string | null;
   summary: string | null;
   roles: string[];
-  seniority: string | null;
+  seniority: string[];
   years_experience: number | null;
   industries: string[];
   locations: string[];
@@ -242,7 +242,7 @@ export function TalentView({ talent, generating, intros }: { talent: TalentRow |
                 <ChipInput value={form.skills} onChange={(v) => set({ skills: v })} placeholder="Add a skill" max={20} />
               </div>
               <p className="text-xs text-muted">
-                Also shown: {[talent.roles.join(" / "), SENIORITY.find(([v]) => v === talent.seniority)?.[1], talent.years_experience ? `${talent.years_experience} years` : null, talent.locations.join(", "), talent.work_modes.join(" / "), talent.salary_min ? `from ${talent.salary_min.toLocaleString()} ${talent.salary_currency}` : null].filter(Boolean).join(" · ")}.
+                Also shown: {[talent.roles.join(" / "), seniorityLabel(talent.seniority, "") || null, talent.years_experience ? `${talent.years_experience} years` : null, talent.locations.join(", "), talent.work_modes.join(" / "), talent.salary_min ? `from ${talent.salary_min.toLocaleString()} ${talent.salary_currency}` : null].filter(Boolean).join(" · ")}.
                 Change these in <Link href="/dashboard/settings#preferences" className="text-wing hover:underline">Settings</Link>, then rebuild.
               </p>
             </section>

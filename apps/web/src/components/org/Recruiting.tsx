@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { requestIntro, searchTalent, withdrawIntro, type IntroInput, type TalentResult } from "@/app/org/talent-actions";
 import { Modal } from "@/components/dashboard/ui";
 import { inputClass } from "@/components/onboarding/fields";
-import { SENIORITY } from "@/lib/onboarding";
+import { seniorityLabel } from "@/lib/onboarding";
 
 export type OrgIntro = {
   id: string;
@@ -22,7 +22,7 @@ export type OrgIntro = {
 };
 
 const AVAILABILITY: Record<string, string> = { now: "Available now", "2_weeks": "2 weeks' notice", "1_month": "1 month's notice", "3_months": "3 months' notice", exploring: "Open to the right role" };
-const seniority = (s: string | null) => SENIORITY.find(([v]) => v === s)?.[1] ?? null;
+const seniority = (s: string[]) => seniorityLabel(s, "") || null;
 
 function IntroModal({ orgId, talent, onClose, onSent }: { orgId: string; talent: TalentResult; onClose: () => void; onSent: () => void }) {
   const router = useRouter();

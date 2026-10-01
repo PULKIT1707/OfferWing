@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Wizard } from "@/components/onboarding/Wizard";
 import { ALERT_DOMAIN } from "@/lib/discovery";
-import { STEPS, withDefaults, type AiSettings, type CareerDocument, type StepId } from "@/lib/onboarding";
+import { LEGACY_STEPS, STEPS, withDefaults, type AiSettings, type CareerDocument, type StepId } from "@/lib/onboarding";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Set up · Offerwing" };
 
+// Continuing past the resume step reads it with AI (server action on this route).
+export const maxDuration = 60;
 
 export default async function OnboardingPage() {
   const supabase = await createClient();
@@ -24,7 +26,8 @@ export default async function OnboardingPage() {
   if (!profile) redirect("/login");
   if (profile.onboarding_step === "done") redirect("/dashboard");
 
-  const step = (STEPS.some((s) => s.id === profile.onboarding_step) ? profile.onboarding_step : "career") as StepId;
+  const saved = LEGACY_STEPS[profile.onboarding_step] ?? profile.onboarding_step;
+  const step = (STEPS.some((s) => s.id === saved) ? saved : STEPS[0].id) as StepId;
   const initialProfile = withDefaults(search);
 
   return (

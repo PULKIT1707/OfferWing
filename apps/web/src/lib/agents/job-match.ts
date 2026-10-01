@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LINKEDIN_TIERS, SENIORITY, type SearchProfile } from "@/lib/onboarding";
+import { LINKEDIN_TIERS, seniorityLabel, type SearchProfile } from "@/lib/onboarding";
 
 // Output contract for the Job Match agent (no min/max constraints so every provider accepts it).
 export const jobMatchSchema = z.object({
@@ -77,7 +77,7 @@ export function buildCandidateContext(profile: SearchProfile, careerText: string
       : "not specified";
   return `<candidate_preferences>
 Target roles: ${list(profile.target_roles)}
-Seniority: ${SENIORITY.find(([v]) => v === profile.seniority)?.[1] ?? "unspecified"}
+Seniority: ${seniorityLabel(profile.seniority)}
 Industries: ${list(profile.industries)}
 Locations: ${list(profile.locations)}; work modes: ${list(profile.work_modes)}; open to relocate: ${profile.open_to_relocate ? "yes" : "no"}
 Needs visa sponsorship: ${profile.needs_sponsorship ? "yes" : "no"}

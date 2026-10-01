@@ -2,7 +2,7 @@
 
 import { Check, Copy, Eye, EyeOff, FileText, KeyRound, Loader2, Lock, Puzzle, Sparkles, Trash2, Upload } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
-import { chooseAiMode, completeDocuments, finishOnboarding, saveCloudKey, type ActionResult } from "@/app/onboarding/actions";
+import { chooseAiMode, completeDocuments, finishOnboarding, prefillFromDocuments, saveCloudKey, type ActionResult, type PrefillResult } from "@/app/onboarding/actions";
 import { PROVIDERS, type AiSettings, type CareerDocument, type Provider } from "@/lib/onboarding";
 import { createClient } from "@/lib/supabase/client";
 import { Field, inputClass, StepFooter, StepHeader } from "./fields";
@@ -29,7 +29,14 @@ const DOC_SLOTS: { kind: CareerDocument["kind"]; title: string; hint: string; ac
 
 const formatSize = (b: number) => (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
 
-export function DocumentsStep({ userId, documents, onDocuments, onDone, onBack, embedded }: Nav & { userId: string; documents: CareerDocument[]; onDocuments: (d: CareerDocument[]) => void }) {
+export function DocumentsStep({
+  userId,
+  documents,
+  onDocuments,
+  onDone,
+  onBack,
+  embedded,
+}: Omit<Nav, "onDone"> & { onDone: (prefill?: PrefillResult) => void; userId: string; documents: CareerDocument[]; onDocuments: (d: CareerDocument[]) => void }) {
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
@@ -65,8 +72,25 @@ export function DocumentsStep({ userId, documents, onDocuments, onDone, onBack, 
   }
 
   return (
-    <form onSubmit={(ev) => { ev.preventDefault(); start(async () => { const r = await completeDocuments(); if (r.error) setError(r.error); else onDone(); }); }}>
-      {!embedded && <StepHeader title="Bring your experience" subtitle="Agents build your career knowledge base from these, and never invent anything that isn't in them." />}
+    <form
+      onSubmit={(ev) => {
+        ev.preventDefault();
+        setError(undefined);
+        start(async () => {
+          // With a resume or LinkedIn PDF, read it to prefill the next screen; otherwise just move on.
+          const hasText = documents.some((d) => d.kind !== "linkedin_export");
+          const r: PrefillResult = hasText ? await prefillFromDocuments() : await completeDocuments();
+          if (r.error) setError(r.error);
+          else onDone(r);
+        });
+      }}
+    >
+      {!embedded && (
+        <StepHeader
+          title="Start with your resume"
+          subtitle="Upload it (or your LinkedIn profile PDF) and we'll fill in the rest for you to check. Agents never invent anything that isn't in it."
+        />
+      )}
       <div className="space-y-3">
         {DOC_SLOTS.map((slot) => {
           const files = documents.filter((d) => d.kind === slot.kind);
@@ -114,7 +138,12 @@ export function DocumentsStep({ userId, documents, onDocuments, onDone, onBack, 
       {embedded ? (
         error && <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       ) : (
-        <StepFooter busy={pending} error={error} onBack={onBack} label={documents.length ? "Continue" : "Skip for now"} />
+        <>
+          {pending && documents.some((d) => d.kind !== "linkedin_export") && (
+            <p className="mt-6 flex items-center gap-2 text-sm text-muted"><Loader2 className="size-4 animate-spin text-wing" /> Reading your resume…</p>
+          )}
+          <StepFooter busy={pending} error={error} onBack={onBack} label={documents.length ? "Continue" : "Skip for now"} />
+        </>
       )}
     </form>
   );

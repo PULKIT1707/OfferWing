@@ -4,7 +4,7 @@ import Link from "next/link";
 import { AuditPanel } from "@/components/dashboard/AuditPanel";
 import { isAuditRunning, type AuditRun } from "@/lib/agents/profile-optimizer";
 import { requireUser } from "@/lib/auth";
-import { LINKEDIN_TIERS, SENIORITY } from "@/lib/onboarding";
+import { LINKEDIN_TIERS, seniorityLabel } from "@/lib/onboarding";
 
 export const metadata: Metadata = { title: "Profile health · Offerwing" };
 
@@ -98,7 +98,7 @@ export default async function ProfilePage() {
             <p className="text-sm font-medium">What your agents are targeting</p>
             <dl className="mt-3">
               <Row label="Roles" value={chips(s?.target_roles)} />
-              <Row label="Seniority" value={SENIORITY.find(([v]) => v === s?.seniority)?.[1]} />
+              <Row label="Seniority" value={seniorityLabel(s?.seniority, "") || undefined} />
               <Row label="Industries" value={chips(s?.industries) ?? "Any"} />
               <Row label="Locations" value={chips(s?.locations)} />
               <Row label="Work mode" value={chips(s?.work_modes?.map((m: string) => m[0].toUpperCase() + m.slice(1)))} />

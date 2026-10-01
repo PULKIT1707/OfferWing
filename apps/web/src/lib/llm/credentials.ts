@@ -37,7 +37,8 @@ export async function resolveCredential(supabase: SupabaseClient, userId: string
     // Without the service-role key (or a readable sponsor key) we fall back to Starter.
   }
 
-  const starterKey = process.env.OFFERWING_STARTER_ANTHROPIC_API_KEY;
+  // Pasted dashboard values sometimes carry spaces, newlines or quotes; Anthropic rejects those with 401.
+  const starterKey = process.env.OFFERWING_STARTER_ANTHROPIC_API_KEY?.trim().replace(/^["']|["']$/g, "");
   if (!starterKey) {
     throw new UserFacingError(
       sponsor

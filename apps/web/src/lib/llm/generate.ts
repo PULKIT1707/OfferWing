@@ -111,7 +111,8 @@ export async function generateStructured<T extends z.ZodType>(r: Request<T>): Pr
       const key = r.credential.apiKey;
       console.error("starter credential failed", status, {
         message: (err as Error).message?.slice(0, 300),
-        keyType: key.match(/^sk-ant-[a-z]+\d*/)?.[0] ?? `unexpected prefix (${key.slice(0, 3)}…)`,
+        provider: r.credential.provider,
+        keyType: key.match(/^(sk-ant-[a-z]+\d*|sk-proj|sk-svcacct|sk-admin|sk|AIza)/)?.[0] ?? "unrecognized prefix",
         keyLength: key.length,
       });
       throw new UserFacingError("Starter credits are temporarily unavailable. Try again later, or add your own AI key in Settings → AI & keys.");

@@ -37,14 +37,36 @@ export async function resolveCredential(supabase: SupabaseClient, userId: string
     // Without the service-role key (or a readable sponsor key) we fall back to Starter.
   }
 
-  // Pasted dashboard values sometimes carry spaces, newlines or quotes; Anthropic rejects those with 401.
-  const starterKey = process.env.OFFERWING_STARTER_ANTHROPIC_API_KEY?.trim().replace(/^["']|["']$/g, "");
-  if (!starterKey) {
+  const starter = starterKey();
+  if (!starter) {
     throw new UserFacingError(
       sponsor
         ? `${sponsor.name}'s sponsored AI isn't reachable right now. Try again later, or add your own AI key in Settings → AI & keys.`
         : "Starter credits aren't available right now. Add your own AI key in Settings → AI & keys.",
     );
   }
-  return { source: "starter", provider: "anthropic", apiKey: starterKey };
+  return { source: "starter", ...starter };
+}
+
+// Which provider a key belongs to, from its prefix.
+export function providerForKey(key: string): Provider | null {
+  if (key.startsWith("sk-ant-")) return "anthropic";
+  if (key.startsWith("AIza")) return "gemini";
+  if (key.startsWith("sk-")) return "openai";
+  return null;
+}
+
+// Offerwing's own key for Starter mode: OFFERWING_STARTER_OPENAI_API_KEY or
+// OFFERWING_STARTER_ANTHROPIC_API_KEY (the first that's set). The provider comes from the key
+// itself, so a key in the "wrong" variable still works.
+export function starterKey(): { provider: Provider; apiKey: string } | null {
+  for (const name of ["OFFERWING_STARTER_OPENAI_API_KEY", "OFFERWING_STARTER_ANTHROPIC_API_KEY"]) {
+    // Pasted dashboard values sometimes carry spaces, newlines or quotes; providers reject those.
+    const apiKey = process.env[name]?.trim().replace(/^["']|["']$/g, "");
+    if (!apiKey) continue;
+    const provider = providerForKey(apiKey);
+    if (provider) return { provider, apiKey };
+    console.error(`${name} doesn't look like an OpenAI, Anthropic or Gemini key`);
+  }
+  return null;
 }

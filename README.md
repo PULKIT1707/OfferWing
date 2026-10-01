@@ -159,7 +159,7 @@ Set these in `apps/web/.env.local`. It's gitignored; never commit it.
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Project URL (Project Settings → API). |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Publishable (anon) key. Safe in the browser because RLS protects the data. |
 | `SUPABASE_SERVICE_ROLE_KEY` | For Always-on mode, inbound email and cron | **Server-only** secret key. Used to decrypt a user's Vault-stored key during an agent run (`get_user_ai_key()`), to file forwarded alert emails (no user session exists for inbound mail) and by the scheduled jobs. |
-| `OFFERWING_STARTER_ANTHROPIC_API_KEY` | For Starter mode | Offerwing's own Anthropic key that powers free Starter usage, within the daily limits below. |
+| `OFFERWING_STARTER_OPENAI_API_KEY` or `OFFERWING_STARTER_ANTHROPIC_API_KEY` | For Starter mode | Offerwing's own key that powers free Starter usage, within the daily limits below. The OpenAI variable wins if both are set; the provider is detected from the key prefix (`sk-ant-` Anthropic, `sk-` OpenAI, `AIza` Gemini). Production currently runs Starter on OpenAI. |
 | `NEXT_PUBLIC_EXTENSION_ID` | For the extension | The only extension ID `/extension/connect` will hand a session to. The dev build's ID is fixed by the manifest `key`: `mgoonaiikahlemfjhcdgpdgjmkjjbmbc`. |
 | `INBOUND_EMAIL_SECRET` | For alert forwarding | Shared secret your inbound-email provider sends as `?secret=` when it POSTs to `/api/inbound/email`. |
 | `ALERT_EMAIL_DOMAIN` | No | Domain of users' alert addresses. Default `alerts.offerwing.app`. |
@@ -275,7 +275,7 @@ Users choose how AI is powered during onboarding and can change it any time in S
 
 | Mode | Key location | Status |
 |---|---|---|
-| **Starter** (default) | Offerwing's `OFFERWING_STARTER_ANTHROPIC_API_KEY` | Daily limits per user, e.g. **2** profile audits, **20** job matches, **5** application kits, **20** outreach drafts, **5** prep packs, **3** content plans, **3** weekly plans (see `lib/llm/quota.ts` and each agent module) |
+| **Starter** (default) | Offerwing's own key (`OFFERWING_STARTER_OPENAI_API_KEY` or `OFFERWING_STARTER_ANTHROPIC_API_KEY`) | Daily limits per user, e.g. **2** profile audits, **20** job matches, **5** application kits, **20** outreach drafts, **5** prep packs, **3** content plans, **3** weekly plans (see `lib/llm/quota.ts` and each agent module) |
 | **Always-on** (`cloud`) | User's own OpenAI / Anthropic / Gemini key, encrypted in Supabase Vault | Unlimited, limited only by the user's own provider account |
 | **Private** | User's key kept only in the browser extension | Job scoring and form-answer drafts run in the extension, straight from the browser to the provider. Web-only agents explain that they need Starter or Always-on. |
 | **Sponsored** | An outplacement organization's key, encrypted in Vault | Applies to Starter-mode members of an active outplacement program. Recorded as `cloud` runs, so Starter limits don't apply; the sponsor controls spend with limits at its provider. Needs `SUPABASE_SERVICE_ROLE_KEY`. |

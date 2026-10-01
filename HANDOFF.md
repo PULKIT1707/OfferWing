@@ -134,6 +134,7 @@ The extension imports shared pure code from `apps/web/src` through the `@/` alia
 | 0014 | organizations, org_members, org_invites, `company_key()`, invite/sponsor/progress functions, org Vault keys; `delete_my_account` also deletes solely owned orgs |
 | 0015 | talent_profiles, intro_requests, search/intro functions; jobs.source `marketplace` |
 | 0016 | hardening: `require_verified_recruiter` / `talent_hidden_from` not directly callable; dropped `get_my_sponsor` |
+| 0017 | search_profiles.seniority and talent_profiles.seniority become text[]; new accounts start onboarding at `documents`; agent `profile_prefill`; search_talent recreated |
 
 Supabase advisors: the only remaining warnings are the three intentional self-service security-definer functions (`delete_my_account`, `set_ai_mode`, `set_cloud_ai_key`) and "leaked password protection disabled" (a dashboard setting).
 

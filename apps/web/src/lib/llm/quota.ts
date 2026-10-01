@@ -9,10 +9,10 @@ export async function starterRunsLeft(supabase: SupabaseClient, table: string, d
   return Math.max(0, dailyLimit - (count ?? 0));
 }
 
-export type AgentName = "content_plan" | "post_draft" | "comment_ideas" | "story_bank" | "weekly_plan" | "form_answers" | "referral_packet" | "talent_profile";
+export type AgentName = "content_plan" | "post_draft" | "comment_ideas" | "story_bank" | "weekly_plan" | "form_answers" | "referral_packet" | "talent_profile" | "profile_prefill";
 
 // Starter-credit limits for agents that log to agent_runs (they have no dedicated run table).
-export const AGENT_DAILY_LIMITS: Record<AgentName, number> = { content_plan: 3, post_draft: 10, comment_ideas: 20, story_bank: 3, weekly_plan: 3, form_answers: 10, referral_packet: 10, talent_profile: 3 };
+export const AGENT_DAILY_LIMITS: Record<AgentName, number> = { content_plan: 3, post_draft: 10, comment_ideas: 20, story_bank: 3, weekly_plan: 3, form_answers: 10, referral_packet: 10, talent_profile: 3, profile_prefill: 5 };
 
 export async function agentRunsLeft(supabase: SupabaseClient, agent: AgentName): Promise<number> {
   const since = new Date();

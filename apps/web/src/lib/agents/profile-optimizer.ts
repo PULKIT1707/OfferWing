@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { SearchProfile } from "@/lib/onboarding";
-import { LINKEDIN_TIERS, SENIORITY } from "@/lib/onboarding";
+import { LINKEDIN_TIERS, seniorityLabel } from "@/lib/onboarding";
 
 // Output contract for the Profile Optimizer. Kept free of min/max constraints so every
 // provider's structured-output mode accepts it; scores are clamped after parsing.
@@ -92,7 +92,7 @@ Hard rules:
 7. For experience_rewrites, cover at most the three most recent roles with 3-5 bullets each.`;
 
 export function buildProfileOptimizerPrompt(profile: SearchProfile, source: "linkedin_pdf" | "resume", documentText: string): string {
-  const seniority = SENIORITY.find(([v]) => v === profile.seniority)?.[1] ?? "unspecified";
+  const seniority = seniorityLabel(profile.seniority);
   const tier = LINKEDIN_TIERS.find(([v]) => v === profile.linkedin_tier)?.[1] ?? "Free";
   const list = (items: string[]) => (items.length ? items.join(", ") : "not specified");
 

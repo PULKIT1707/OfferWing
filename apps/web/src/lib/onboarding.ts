@@ -1,15 +1,18 @@
 import { z } from "zod";
 
+// Onboarding asks for as little as possible: the resume first, then one prefilled "basics" screen.
+// Plan, target companies and writing samples live in Settings (the "linkedin" form).
 export const STEPS = [
-  { id: "career", title: "Your goals", hint: "Roles and search mode" },
-  { id: "preferences", title: "Preferences", hint: "Location, pay and time" },
-  { id: "linkedin", title: "LinkedIn", hint: "Plan and target companies" },
-  { id: "documents", title: "Your experience", hint: "Resume and LinkedIn data" },
+  { id: "documents", title: "Your resume", hint: "We read it so you type less" },
+  { id: "career", title: "Check the basics", hint: "Prefilled from your resume" },
   { id: "ai", title: "Power your AI", hint: "Choose how agents run" },
   { id: "connect", title: "Connect", hint: "Job alerts and extension" },
 ] as const;
 
 export type StepId = (typeof STEPS)[number]["id"];
+
+// Steps from the older, longer wizard that may still be saved on a profile.
+export const LEGACY_STEPS: Record<string, StepId> = { preferences: "career", linkedin: "career" };
 
 export const SENIORITY = [
   ["intern", "Intern"],
@@ -52,28 +55,30 @@ const list = z.array(z.string().trim().min(1).max(80)).max(20);
 
 export const careerSchema = z.object({
   target_roles: list.min(1, "Add at least one target role").max(3, "Pick up to 3 roles"),
-  seniority: z.enum(SENIORITY.map(([v]) => v) as [string, ...string[]]),
+  seniority: z.array(z.enum(SENIORITY.map(([v]) => v) as [string, ...string[]])).min(1, "Pick at least one level").max(4, "Pick up to 4 levels"),
   industries: list,
   search_mode: z.enum(["open", "stealth"]),
   urgency: z.enum(["active", "exploring"]),
 });
 
-export const preferencesSchema = z
-  .object({
-    locations: list.min(1, "Add at least one location (or \"Anywhere\")"),
-    work_modes: z.array(z.enum(["remote", "hybrid", "onsite"])).min(1, "Pick at least one work mode"),
-    open_to_relocate: z.boolean(),
-    needs_sponsorship: z.boolean(),
-    salary_min: z.number().int().min(0).nullable(),
-    salary_target: z.number().int().min(0).nullable(),
-    salary_currency: z.enum(CURRENCIES),
-    notice_period: z.string().trim().max(40).nullable(),
-    daily_minutes: z.union([z.literal(15), z.literal(30), z.literal(60), z.literal(90)]),
-  })
-  .refine((v) => v.salary_min == null || v.salary_target == null || v.salary_target >= v.salary_min, {
-    message: "Target salary should be at least your minimum",
-    path: ["salary_target"],
-  });
+const preferencesFields = z.object({
+  locations: list.min(1, "Add at least one location (or \"Anywhere\")"),
+  work_modes: z.array(z.enum(["remote", "hybrid", "onsite"])).min(1, "Pick at least one work mode"),
+  open_to_relocate: z.boolean(),
+  needs_sponsorship: z.boolean(),
+  salary_min: z.number().int().min(0).nullable(),
+  salary_target: z.number().int().min(0).nullable(),
+  salary_currency: z.enum(CURRENCIES),
+  notice_period: z.string().trim().max(40).nullable(),
+  daily_minutes: z.union([z.literal(15), z.literal(30), z.literal(60), z.literal(90)]),
+});
+const salaryOrder = (v: { salary_min: number | null; salary_target: number | null }) => v.salary_min == null || v.salary_target == null || v.salary_target >= v.salary_min;
+const salaryOrderError = { message: "Target salary should be at least your minimum", path: ["salary_target"] };
+
+export const preferencesSchema = preferencesFields.refine(salaryOrder, salaryOrderError);
+
+// The single onboarding screen: goals and preferences together.
+export const basicsSchema = careerSchema.extend(preferencesFields.shape).refine(salaryOrder, salaryOrderError);
 
 export const linkedinSchema = z.object({
   linkedin_tier: z.enum(LINKEDIN_TIERS.map(([v]) => v) as [string, ...string[]]),
@@ -95,7 +100,7 @@ export type CareerDocument = { id: string; kind: "resume" | "linkedin_pdf" | "li
 
 export const DEFAULT_PROFILE: SearchProfile = {
   target_roles: [],
-  seniority: "mid",
+  seniority: [],
   industries: [],
   search_mode: "open",
   urgency: "active",
@@ -118,4 +123,10 @@ export const DEFAULT_PROFILE: SearchProfile = {
 // Fills unset columns so forms always get a complete profile.
 export function withDefaults(row: Record<string, unknown> | null | undefined): SearchProfile {
   return { ...DEFAULT_PROFILE, ...Object.fromEntries(Object.entries(row ?? {}).filter(([, v]) => v !== null)) } as SearchProfile;
+}
+
+// "Senior / Lead / Staff" for prompts and labels; levels are shown in ladder order.
+export function seniorityLabel(levels: readonly string[] | null | undefined, fallback = "unspecified"): string {
+  const labels = SENIORITY.filter(([v]) => levels?.includes(v)).map(([, l]) => l);
+  return labels.length ? labels.join(" / ") : fallback;
 }

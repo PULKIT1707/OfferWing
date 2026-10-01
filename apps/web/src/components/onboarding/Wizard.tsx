@@ -3,11 +3,11 @@
 import { Check } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { goToStep } from "@/app/onboarding/actions";
+import { goToStep, type PrefillResult } from "@/app/onboarding/actions";
 import { Logo } from "@/components/landing/Logo";
 import { STEPS, type AiSettings, type CareerDocument, type SearchProfile, type StepId } from "@/lib/onboarding";
 import { AiStep, ConnectStep, DocumentsStep } from "./steps-setup";
-import { CareerStep, LinkedinStep, PreferencesStep } from "./steps-profile";
+import { BasicsStep } from "./steps-profile";
 
 type Props = {
   userId: string;
@@ -25,6 +25,7 @@ export function Wizard({ userId, firstName, alertAddress, initialStep, initialPr
   const [profile, setProfile] = useState(initialProfile);
   const [ai, setAi] = useState(initialAi);
   const [documents, setDocuments] = useState(initialDocuments);
+  const [prefill, setPrefill] = useState<{ filled: string[]; aiNote?: string } | null>(null);
   const index = STEPS.findIndex((s) => s.id === step);
 
   const go = (i: number) => {
@@ -89,10 +90,18 @@ export function Wizard({ userId, firstName, alertAddress, initialStep, initialPr
           </div>
           <p className="mb-3 text-sm font-medium text-wing">Step {index + 1} of {STEPS.length}</p>
 
-          {step === "career" && <CareerStep profile={profile} onDone={next} />}
-          {step === "preferences" && <PreferencesStep profile={profile} onDone={next} onBack={back} />}
-          {step === "linkedin" && <LinkedinStep profile={profile} onDone={next} onBack={back} />}
-          {step === "documents" && <DocumentsStep userId={userId} documents={documents} onDocuments={setDocuments} onDone={() => next()} onBack={back} />}
+          {step === "documents" && (
+            <DocumentsStep
+              userId={userId}
+              documents={documents}
+              onDocuments={setDocuments}
+              onDone={(r?: PrefillResult) => {
+                if (r?.filled?.length || r?.aiNote) setPrefill({ filled: r.filled ?? [], aiNote: r.aiNote });
+                next(r?.profile);
+              }}
+            />
+          )}
+          {step === "career" && <BasicsStep key={JSON.stringify(profile)} profile={profile} prefill={prefill} onDone={next} onBack={back} />}
           {step === "ai" && <AiStep ai={ai} onAi={setAi} onDone={() => next()} onBack={back} />}
           {step === "connect" && <ConnectStep address={alertAddress} onBack={back} />}
         </div>

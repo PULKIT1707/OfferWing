@@ -107,7 +107,13 @@ export async function generateStructured<T extends z.ZodType>(r: Request<T>): Pr
     if (err instanceof UserFacingError) throw err;
     const status = (err as { status?: number }).status;
     if (r.credential.source === "starter" && (status === 401 || status === 403 || status === 429)) {
-      console.error("starter credential failed", status);
+      // Safe diagnostics: the provider's message plus the key's type prefix and length, never the key.
+      const key = r.credential.apiKey;
+      console.error("starter credential failed", status, {
+        message: (err as Error).message?.slice(0, 300),
+        keyType: key.match(/^sk-ant-[a-z]+\d*/)?.[0] ?? `unexpected prefix (${key.slice(0, 3)}…)`,
+        keyLength: key.length,
+      });
       throw new UserFacingError("Starter credits are temporarily unavailable. Try again later, or add your own AI key in Settings → AI & keys.");
     }
     if (status === 401 || status === 403) throw new UserFacingError("Your AI provider rejected the key. Update it in Settings → AI & keys.");

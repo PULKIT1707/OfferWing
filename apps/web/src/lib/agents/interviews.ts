@@ -37,7 +37,7 @@ export const storyBankSchema = z.object({
 
 export const STORY_BANK_SYSTEM = `You turn a candidate's resume and LinkedIn profile into a bank of STAR interview stories (Situation, Task, Action, Result).
 - Write 8 to 12 distinct stories covering different competencies (leadership, conflict, failure, ambiguity, impact...).
-- Use only facts in the documents. Never invent employers, projects, numbers or outcomes. Where a detail would help but isn't there, write a [placeholder] the candidate can fill in.
+- Use only facts in the documents. Never invent employers, projects, numbers or outcomes. Using a tool, library or product is not building it: say the candidate built, founded, led or authored something only when the documents say so. Where a detail would help but isn't there, write a [placeholder] the candidate can fill in.
 - First person, concise: 1-3 sentences per part.
 ${UNTRUSTED}`;
 

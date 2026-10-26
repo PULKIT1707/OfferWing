@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ApplicationKit } from "./application-tailor";
-import { verifyKit } from "./truthfulness";
+import { replaceInventedNumbers, verifyKit } from "./truthfulness";
 
 const source = `Alex Morgan
 Northwind Labs
@@ -71,5 +71,45 @@ describe("verifyKit", () => {
     expect(reasons).toContain("Number not in your documents: 8");
     expect(reasons).toContain("Number not in your documents: 12");
     expect(v.unverified_skills).toEqual(["Kubernetes"]);
+  });
+});
+
+describe("claim checks against their own quote", () => {
+  const role = (bullets: { text: string; evidence: string }[]) => ({ title: "Product Designer", company: "Northwind Labs", location: "", dates: "", bullets });
+  const reasonsFor = (bullets: { text: string; evidence: string }[]) => verifyKit(kit({ experience: [role(bullets)] }), source).flagged.flatMap((f) => f.reasons);
+
+  it("flags a leadership verb the quote doesn't support", () => {
+    const reasons = reasonsFor([{ text: "Led the design system across teams", evidence: "Helped build the design system" }]);
+    expect(reasons).toContain('Says "led", but the supporting quote doesn\'t');
+  });
+
+  it("accepts the same verb in a different form", () => {
+    expect(reasonsFor([{ text: "Building the design system with engineering", evidence: "Helped build the design system" }])).toEqual([]);
+  });
+
+  it("flags a number from elsewhere in the documents that this quote doesn't contain", () => {
+    const reasons = reasonsFor([{ text: "Helped build the design system used by 40 customers", evidence: "Helped build the design system" }]);
+    expect(reasons).toContain("Number not in this claim's supporting quote: 40");
+    expect(reasons.join(" ")).not.toContain("Number not in your documents");
+  });
+
+  it("flags names that appear nowhere in the documents", () => {
+    const reasons = reasonsFor([{ text: "Helped build the design system in Sketch and Kubernetes", evidence: "Helped build the design system" }]);
+    expect(reasons).toContain("Names not in your documents: Sketch, Kubernetes");
+    expect(reasonsFor([{ text: "Helped build the design system in Figma", evidence: "Helped build the design system" }])).toEqual([]);
+  });
+
+  it("marks a reworded quote as a loose match rather than a pass", () => {
+    const reasons = reasonsFor([{ text: "Ran interviews", evidence: "Customers ran 40 user interviews with" }]);
+    expect(reasons.some((r) => r.startsWith("Supporting quote only loosely matches"))).toBe(true);
+  });
+});
+
+describe("replaceInventedNumbers", () => {
+  it("keeps numbers from the documents and placeholders, and replaces the rest", () => {
+    expect(replaceInventedNumbers("Interviewed 40 customers and grew retention 25% in 2023 [X%]", source)).toBe(
+      "Interviewed 40 customers and grew retention [X]% in [X] [X%]",
+    );
+    expect(replaceInventedNumbers("Cut drop-off by 1,200 users", source)).toBe("Cut drop-off by 1,200 users");
   });
 });

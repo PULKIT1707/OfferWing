@@ -28,7 +28,7 @@ export const TALENT_PROFILE_SYSTEM = `You are Offerwing's Talent Profile writer.
 
 Rules:
 1. Anonymous: never include the candidate's name, any employer, client, school or product name, email, phone, link or exact location beyond city/region. Describe employers generically by stage, size or sector ("a Series B fintech", "a Fortune 500 retailer").
-2. Truthful: use only facts from the documents. Never invent titles, years, tools, metrics or achievements. Every highlight needs a verbatim evidence quote.
+2. Truthful: use only facts from the documents. Never invent titles, years, tools, metrics or achievements. Using a tool, library or product is not building it: say the candidate built, founded, led or authored something only when the documents say so. Every highlight needs a verbatim evidence quote.
 3. Never add a number the documents don't contain.
 4. 3-5 highlights, the strongest first. Specific beats impressive.
 5. Skills must appear in the documents.

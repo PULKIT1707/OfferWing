@@ -33,6 +33,7 @@ import { credentialForAgent } from "@/lib/llm/agent-credential";
 import { recordAgentRun, type StarterAgent } from "@/lib/llm/quota";
 import { researchWithWeb } from "@/lib/llm/research";
 import { withDefaults } from "@/lib/onboarding";
+import { replaceInventedNumbers } from "@/lib/agents/truthfulness";
 
 type Supabase = Awaited<ReturnType<typeof requireUser>>["supabase"];
 
@@ -60,7 +61,19 @@ export async function extractStories(): Promise<{ error?: string; added?: number
     await recordAgentRun(supabase, userId, "story_bank", credential, result.model);
     // Replace earlier extracted stories; stories the user wrote or edited by hand stay.
     await supabase.from("stories").delete().eq("user_id", userId).eq("source", "extracted");
-    const rows = result.data.stories.slice(0, 15).map((s) => ({ ...s, user_id: userId, source: "extracted", title: s.title.slice(0, 200) }));
+    // Extracted stories are reused by prep packs and practice, so a number the documents don't
+    // contain becomes a [placeholder] here rather than a "fact" later.
+    const clean = (t: string) => replaceInventedNumbers(t, careerText);
+    const rows = result.data.stories.slice(0, 15).map((s) => ({
+      ...s,
+      situation: clean(s.situation),
+      task: clean(s.task),
+      action: clean(s.action),
+      result: clean(s.result),
+      user_id: userId,
+      source: "extracted",
+      title: clean(s.title).slice(0, 200),
+    }));
     const { error } = await supabase.from("stories").insert(rows);
     if (error) return { error: "Couldn't save the stories. Please try again." };
     revalidatePath("/dashboard/interviews");

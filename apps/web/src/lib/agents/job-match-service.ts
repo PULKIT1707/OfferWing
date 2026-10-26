@@ -5,6 +5,7 @@ import { OPEN_STAGES, sameCompany } from "@/lib/dashboard";
 import { allowedRuns, credentialForAgent } from "@/lib/llm/agent-credential";
 import { releaseStarterRuns } from "@/lib/llm/quota";
 import { modelFor } from "@/lib/llm/models";
+import { checkPostingsLive } from "./job-gates";
 import { isMatchRunning } from "./job-match";
 import { runJobMatches } from "./job-match-runner";
 
@@ -18,7 +19,7 @@ export async function queueJobMatches(
   // Client for the background run; defaults to the caller's client.
   backgroundClient: () => Promise<SupabaseClient> = async () => supabase,
 ): Promise<StartResult> {
-  let query = supabase.from("jobs").select("id, title, company, description, fit_score, stage");
+  let query = supabase.from("jobs").select("id, title, company, url, description, fit_score, stage");
   // "unscored" leaves out jobs without a description; they can't be scored and aren't counted in the UI.
   query =
     jobIds === "unscored"
@@ -42,16 +43,23 @@ export async function queueJobMatches(
     if (reason) skipped.push({ title: `${j.title} at ${j.company}`, reason });
     return !reason;
   });
-  if (!eligible.length) {
+  // A closed posting shouldn't cost an AI run: ask Greenhouse, Lever or Ashby before scoring.
+  const liveness = await checkPostingsLive(eligible.map((j) => j.url));
+  const open = eligible.filter((j, i) => {
+    if (liveness[i] !== "closed") return true;
+    skipped.push({ title: `${j.title} at ${j.company}`, reason: "the posting has closed" });
+    return false;
+  });
+  if (!open.length) {
     return { queued: 0, skipped, error: jobIds === "unscored" && !skipped.length ? "Every open job is already scored." : undefined };
   }
 
   // Claims one Starter run per job up front; a batch may get fewer than it asked for.
-  const credential = await credentialForAgent(supabase, userId, "job_match", eligible.length);
+  const credential = await credentialForAgent(supabase, userId, "job_match", open.length);
   if ("error" in credential) return { queued: 0, skipped, error: credential.error };
-  const left = allowedRuns(credential, eligible.length);
-  for (const j of eligible.slice(left)) skipped.push({ title: `${j.title} at ${j.company}`, reason: "Starter daily limit reached" });
-  const batch = eligible.slice(0, left);
+  const left = allowedRuns(credential, open.length);
+  for (const j of open.slice(left)) skipped.push({ title: `${j.title} at ${j.company}`, reason: "Starter daily limit reached" });
+  const batch = open.slice(0, left);
   const { data: rows, error } = await supabase
     .from("job_matches")
     .insert(

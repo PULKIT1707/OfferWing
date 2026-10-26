@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, CircleDashed, Loader2, RefreshCw, Sparkles, Target } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleDashed, HelpCircle, Loader2, RefreshCw, ShieldAlert, Sparkles, Target } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { startJobMatches } from "@/app/dashboard/jobs/actions";
 import type { JobMatch, MatchRun } from "@/lib/agents/job-match";
@@ -13,6 +13,18 @@ export const VERDICT_STYLE: Record<JobMatch["verdict"], { label: string; classNa
   good: { label: "Good fit", className: "bg-offer text-ink" },
   stretch: { label: "Stretch", className: "bg-amber-100 text-amber-800" },
   weak: { label: "Weak fit", className: "bg-rose-100 text-rose-700" },
+};
+
+const LEGITIMACY: Record<NonNullable<JobMatch["legitimacy"]>, { label: string; className: string }> = {
+  high_confidence: { label: "Looks like a real, open role", className: "bg-emerald-50 text-emerald-800" },
+  proceed_with_caution: { label: "Mixed signals about this posting", className: "bg-amber-50 text-amber-900" },
+  suspicious: { label: "This posting looks suspicious. Check it before you apply", className: "bg-rose-50 text-rose-900" },
+};
+
+const CONFIDENCE: Record<NonNullable<JobMatch["confidence"]>, string> = {
+  high: "High confidence: every part of this score is backed by the posting or your documents.",
+  medium: "Medium confidence: some of this score rests on details the posting or your documents don't state.",
+  low: "Low confidence: key evidence is missing, so treat this score as a rough guess.",
 };
 
 const CHANNEL_LABEL: Record<JobMatch["recommended_channel"], string> = {
@@ -48,6 +60,17 @@ function MatchResult({ m }: { m: JobMatch }) {
         </div>
       </div>
 
+      {m.confidence && <p className="text-xs text-muted">{CONFIDENCE[m.confidence]}</p>}
+      {m.verdict === "weak" && (
+        <p className="rounded-2xl bg-card p-4 text-sm">
+          We&apos;d skip this one. A few well-matched applications get more interviews than many weak ones. Apply only if you have a specific reason this score misses.
+        </p>
+      )}
+      {m.legitimacy && (
+        <p className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm ${LEGITIMACY[m.legitimacy].className}`}>
+          <ShieldAlert className="size-4 shrink-0" /> {LEGITIMACY[m.legitimacy].label}
+        </p>
+      )}
       <div className="rounded-2xl bg-wing/5 p-4 text-sm">
         <p className="flex items-center gap-2 font-medium text-wing">
           <Target className="size-4" /> {CHANNEL_LABEL[m.recommended_channel]}
@@ -57,6 +80,15 @@ function MatchResult({ m }: { m: JobMatch }) {
 
       <List title="Conflicts with your preferences" items={m.preference_conflicts} tone="rose" />
       <List title="Red flags in the posting" items={m.red_flags} tone="amber" />
+      <List title="Text in the posting that tried to instruct the AI (ignored)" items={m.injected_instructions ?? []} tone="rose" />
+      {(m.open_questions?.length ?? 0) > 0 && (
+        <div className="rounded-2xl bg-card p-4 text-sm">
+          <p className="flex items-center gap-2 font-medium">
+            <HelpCircle className="size-4" /> Worth checking before you apply
+          </p>
+          <ul className="mt-2 space-y-1 text-muted">{m.open_questions!.map((q) => <li key={q}>• {q}</li>)}</ul>
+        </div>
+      )}
 
       {m.matched.length > 0 && (
         <div>

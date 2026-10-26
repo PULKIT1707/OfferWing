@@ -40,7 +40,7 @@ AI job-search agents for LinkedIn users. Offerwing audits your profile, scores j
 | Outreach | `/dashboard/outreach` | Follow-ups due (max two per person), people to ask for referrals, connection notes for recruiters and hiring managers, a weekly invite budget and recent drafts. You send everything yourself. |
 | Content | `/dashboard/content` | A two-week post plan, drafts in your voice with alternative hooks, "Open in LinkedIn" pre-filled posts and comment ideas for posts you paste. |
 | Interviews & offers | `/dashboard/interviews` | A STAR story bank built from your resume, per-job prep packs (with web research on Anthropic), practice feedback, offer comparison and negotiation plans. |
-| Insights | `/dashboard/insights` | Pipeline and activity metrics. |
+| Insights | `/dashboard/insights` | Pipeline and activity metrics, plus a calibration view: response and interview rates by fit-score band, with a note when a lower band is doing better than a higher one (advisory only; it never changes scoring). |
 | Settings | `/dashboard/settings` | Application details (what forms ask for), job sources (alert forwarding address and followed careers pages), AI mode and provider key, outplacement program sharing, export all your data as JSON, delete your account. |
 | Organizations | `/org`, `/org/[id]`, `/join/[code]` | **Outplacement**: an employer invites leavers with seat-limited invite links, sponsors their AI with its own key (Vault), brands the experience and sees program totals (only once 5 people join) plus individual progress for people who opt in. **Recruiting**: a team Offerwing has verified searches the talent marketplace and sends intro requests. |
 | Browser extension | `apps/extension` | Chrome side panel on LinkedIn job, profile and company pages: fit score, who you know, save to pipeline, screening answers. On application forms (Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Workable, or any site after a one-time permission) it **fills the form** from your application details, the job's kit and your resume, drafts answers to open questions, and marks the job applied. It never submits, and never touches demographic or consent questions. Reads a page only when you click. |
@@ -322,6 +322,7 @@ Run from `apps/web`:
 | `npm run lint` | ESLint (`eslint-config-next`) |
 | `npm test` | Unit tests (Vitest) for parsers, scoring, the truthfulness check and date handling |
 | `npm run typecheck` | `tsc --noEmit` (run `npx next typegen` first on a fresh checkout) |
+| `npm run eval:golden` | Golden-set eval for Job Match. Offline by default; with `OFFERWING_EVAL_<PROVIDER>_API_KEY` set it scores the synthetic cases on real models and writes a report to `evals/results/` (see `apps/web/evals/README.md`) |
 
 ## Deployment
 

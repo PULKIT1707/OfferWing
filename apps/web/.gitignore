@@ -42,3 +42,6 @@ next-env.d.ts
 !.env.example
 # Public build-time values only (safe in the browser); secrets go in Vercel env vars.
 !.env.production
+
+# golden-set eval output
+/evals/results/

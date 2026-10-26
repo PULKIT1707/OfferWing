@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "eval:golden": "vitest run --config vitest.eval.config.mts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

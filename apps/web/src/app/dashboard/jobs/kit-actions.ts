@@ -1,12 +1,12 @@
 "use server";
 
 import { after } from "next/server";
-import { APPLICATION_TAILOR_SYSTEM, applicationKitSchema, buildTailorContext, buildTailorPrompt, isKitRunning, normalizeKit, STARTER_DAILY_KITS } from "@/lib/agents/application-tailor";
+import { APPLICATION_TAILOR_SYSTEM, applicationKitSchema, buildTailorContext, buildTailorPrompt, isKitRunning, normalizeKit } from "@/lib/agents/application-tailor";
 import type { JobMatch } from "@/lib/agents/job-match";
 import { verifyKit } from "@/lib/agents/truthfulness";
 import { requireUser } from "@/lib/auth";
 import { DOCUMENT_COLUMNS, readDocumentText, type StoredDocument } from "@/lib/documents";
-import { resolveCredential } from "@/lib/llm/credentials";
+import { credentialForAgent } from "@/lib/llm/agent-credential";
 import { UserFacingError } from "@/lib/llm/errors";
 import { generateStructured } from "@/lib/llm/generate";
 import { modelFor } from "@/lib/llm/models";
@@ -25,27 +25,8 @@ export async function startApplicationKit(jobId: string): Promise<{ error?: stri
   if (isKitRunning(latest)) return { error: "This application kit is already being written." };
   if (!docs?.length) return { error: "Upload your resume (or LinkedIn PDF) in Settings first." };
 
-  let credential;
-  try {
-    credential = await resolveCredential(supabase, userId);
-  } catch (err) {
-    if (err instanceof UserFacingError) return { error: err.message };
-    throw err;
-  }
-
-  if (credential.source === "starter") {
-    const since = new Date();
-    since.setHours(0, 0, 0, 0);
-    const { count } = await supabase
-      .from("application_kits")
-      .select("id", { count: "exact", head: true })
-      .eq("credential", "starter")
-      .gte("created_at", since.toISOString());
-    if ((count ?? 0) >= STARTER_DAILY_KITS) {
-      return { error: `Starter includes ${STARTER_DAILY_KITS} application kits a day. Add your own AI key in Settings for unlimited kits.` };
-    }
-  }
-
+  const credential = await credentialForAgent(supabase, userId, "application_kit");
+  if ("error" in credential) return credential;
   const { data: run, error } = await supabase
     .from("application_kits")
     .insert({ user_id: userId, job_id: jobId, credential: credential.source, provider: credential.provider, model: modelFor(credential.provider, "standard") })

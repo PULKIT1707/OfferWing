@@ -40,8 +40,6 @@ export function normalizeKit(k: ApplicationKit): ApplicationKit {
 }
 
 export const KIT_STALE_AFTER_MS = 8 * 60 * 1000;
-export const STARTER_DAILY_KITS = 5;
-
 export function isKitRunning(run: { status: string; created_at: string } | null | undefined): boolean {
   return run?.status === "running" && Date.now() - new Date(run.created_at).getTime() < KIT_STALE_AFTER_MS;
 }

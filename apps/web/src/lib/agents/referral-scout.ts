@@ -112,8 +112,6 @@ export const referralDraftSchema = z.object({
 });
 export type ReferralDraft = z.infer<typeof referralDraftSchema>;
 
-export const STARTER_DAILY_DRAFTS = 20;
-
 export const REFERRAL_DRAFT_SYSTEM = `You are Offerwing's Referral Scout. You write referral requests that people are happy to say yes to.
 
 A great referral ask:

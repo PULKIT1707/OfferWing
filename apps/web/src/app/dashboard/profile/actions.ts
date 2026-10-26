@@ -5,7 +5,7 @@ import { after } from "next/server";
 import { buildProfileOptimizerPrompt, isAuditRunning, normalizeAudit, PROFILE_OPTIMIZER_SYSTEM, profileAuditSchema } from "@/lib/agents/profile-optimizer";
 import { requireUser } from "@/lib/auth";
 import { DOCUMENT_COLUMNS, pickDocument, readDocumentText } from "@/lib/documents";
-import { resolveCredential, STARTER_DAILY_AUDITS } from "@/lib/llm/credentials";
+import { credentialForAgent } from "@/lib/llm/agent-credential";
 import { UserFacingError } from "@/lib/llm/errors";
 import { generateStructured } from "@/lib/llm/generate";
 import { modelFor } from "@/lib/llm/models";
@@ -33,27 +33,8 @@ export async function startProfileAudit(): Promise<{ error?: string }> {
   const doc = pickDocument(docs, "linkedin_pdf", "resume");
   if (!doc) return { error: "Upload your LinkedIn profile PDF or resume first." };
 
-  let credential;
-  try {
-    credential = await resolveCredential(supabase, userId);
-  } catch (err) {
-    if (err instanceof UserFacingError) return { error: err.message };
-    throw err;
-  }
-
-  if (credential.source === "starter") {
-    const since = new Date();
-    since.setHours(0, 0, 0, 0);
-    const { count } = await supabase
-      .from("profile_audits")
-      .select("id", { count: "exact", head: true })
-      .eq("credential", "starter")
-      .gte("created_at", since.toISOString());
-    if ((count ?? 0) >= STARTER_DAILY_AUDITS) {
-      return { error: `Starter includes ${STARTER_DAILY_AUDITS} audits a day. Add your own AI key in Settings for unlimited runs.` };
-    }
-  }
-
+  const credential = await credentialForAgent(supabase, userId, "profile_audit");
+  if ("error" in credential) return credential;
   const { data: run, error } = await supabase
     .from("profile_audits")
     .insert({

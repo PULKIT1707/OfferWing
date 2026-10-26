@@ -34,8 +34,6 @@ export function normalizeMatch(m: JobMatch): JobMatch {
 }
 
 export const MATCH_STALE_AFTER_MS = 5 * 60 * 1000;
-export const STARTER_DAILY_MATCHES = 20;
-
 export function isMatchRunning(run: { status: string; created_at: string } | null | undefined): boolean {
   return run?.status === "running" && Date.now() - new Date(run.created_at).getTime() < MATCH_STALE_AFTER_MS;
 }

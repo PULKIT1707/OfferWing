@@ -15,7 +15,6 @@ import {
   PREP_SYSTEM,
   prepPackSchema,
   ROUNDS,
-  STARTER_DAILY,
   STORY_BANK_SYSTEM,
   STORY_COLUMNS,
   storyBankSchema,
@@ -27,31 +26,18 @@ import type { JobMatch } from "@/lib/agents/job-match";
 import { buildNegotiationPrompt, NEGOTIATION_SYSTEM, negotiationSchema, OFFER_COLUMNS, type Offer } from "@/lib/agents/negotiation";
 import { requireUser } from "@/lib/auth";
 import { loadCareerText } from "@/lib/documents";
-import { resolveCredential, type Credential } from "@/lib/llm/credentials";
 import { UserFacingError } from "@/lib/llm/errors";
 import { generateStructured } from "@/lib/llm/generate";
 import { modelFor } from "@/lib/llm/models";
 import { credentialForAgent } from "@/lib/llm/agent-credential";
-import { recordAgentRun, starterRunsLeft } from "@/lib/llm/quota";
+import { recordAgentRun, type StarterAgent } from "@/lib/llm/quota";
 import { researchWithWeb } from "@/lib/llm/research";
 import { withDefaults } from "@/lib/onboarding";
 
 type Supabase = Awaited<ReturnType<typeof requireUser>>["supabase"];
 
-// Resolves the user's AI credential and enforces the Starter daily limit for one agent table.
-async function credentialFor(supabase: Supabase, userId: string, table: string, limit: number, what: string): Promise<Credential | { error: string }> {
-  try {
-    const credential = await resolveCredential(supabase, userId);
-    if (credential.source === "starter" && !(await starterRunsLeft(supabase, table, limit))) {
-      return { error: `Starter includes ${limit} ${what} a day. Add your own AI key in Settings for unlimited use.` };
-    }
-    return credential;
-  } catch (err) {
-    if (err instanceof UserFacingError) return { error: err.message };
-    throw err;
-  }
-}
-
+// Resolves the user's AI credential and claims one Starter run of the agent (see agent-credential.ts).
+const credentialFor = (supabase: Supabase, userId: string, agent: StarterAgent) => credentialForAgent(supabase, userId, agent);
 const friendly = (err: unknown, fallback: string) => {
   if (err instanceof UserFacingError) return err.message;
   console.error(fallback, err);
@@ -126,7 +112,7 @@ export async function startPrep(jobId: string, round: Round, interviewerNotes: s
   if (!job) return { error: "Job not found." };
   if (isPrepRunning(latest)) return { error: "A prep pack is already being written for this job." };
 
-  const credential = await credentialFor(supabase, userId, "interview_preps", STARTER_DAILY.preps, "prep packs");
+  const credential = await credentialFor(supabase, userId, "interview_prep");
   if ("error" in credential) return credential;
 
   const { data: run, error } = await supabase
@@ -187,7 +173,7 @@ export async function practiceAnswer(jobId: string | null, question: string, ans
   const a = answer.trim().slice(0, 8000);
   if (!q || a.length < 20) return { error: "Write a fuller answer first (a few sentences)." };
   const { supabase, userId } = await requireUser();
-  const credential = await credentialFor(supabase, userId, "practice_answers", STARTER_DAILY.practice, "practice answers");
+  const credential = await credentialFor(supabase, userId, "practice_answer");
   if ("error" in credential) return credential;
   const { data: job } = jobId ? await supabase.from("jobs").select("title, company").eq("id", jobId).maybeSingle() : { data: null };
 
@@ -258,19 +244,8 @@ export async function planNegotiation(offerId: string): Promise<{ error?: string
   const offer = (offers as Offer[] | null)?.find((o) => o.id === offerId);
   if (!offer) return { error: "Offer not found." };
 
-  let credential: Credential;
-  try {
-    credential = await resolveCredential(supabase, userId);
-  } catch (err) {
-    return { error: friendly(err, "Couldn't start.") };
-  }
-  if (credential.source === "starter") {
-    const since = new Date();
-    since.setHours(0, 0, 0, 0);
-    const plannedToday = (offers as Offer[]).filter((o) => o.negotiation_updated_at && o.negotiation_updated_at >= since.toISOString()).length;
-    if (plannedToday >= STARTER_DAILY.negotiation) return { error: `Starter includes ${STARTER_DAILY.negotiation} negotiation plans a day. Add your own AI key in Settings for unlimited use.` };
-  }
-
+  const credential = await credentialFor(supabase, userId, "negotiation");
+  if ("error" in credential) return credential;
   const prefs = withDefaults(search);
   const salaryGoal =
     prefs.salary_min != null || prefs.salary_target != null ? `minimum ${prefs.salary_min ?? "?"}, target ${prefs.salary_target ?? "?"} ${prefs.salary_currency}` : "not specified";

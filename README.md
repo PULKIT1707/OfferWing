@@ -78,7 +78,9 @@ OfferWing/
 │       ├── 0009_outreach.sql      follow-ups and connection notes, send tracking
 │       ├── 0010_interviews_offers.sql stories, interview_preps, practice_answers, offers
 │       ├── 0011_content.sql       content_posts, agent_runs (Starter limits)
-│       └── 0012_weekly_plans.sql  weekly_plans
+│       ├── 0012_weekly_plans.sql  weekly_plans
+│       ├── 0013–0017              autofill, referral packets, organizations, talent marketplace, onboarding prefill
+│       └── 0018_starter_usage_ledger.sql  starter_limits, starter_usage, claim_starter_runs()
 ├── .github/workflows/ci.yml       Lint, type check, tests and extension build
 └── apps/
     ├── extension/                 Chrome MV3 side panel (esbuild + React); see apps/extension/README.md
@@ -125,7 +127,7 @@ npm install
 ### 2. Set up Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Apply the migrations **in order** (`0001` → `0012`). Either:
+2. Apply the migrations **in order** (`0001` → `0018`). Either:
    - paste each file from `supabase/migrations/` into **SQL Editor** and run it, or
    - with the Supabase CLI: `supabase link --project-ref <ref>` then `supabase db push` from the repo root.
 3. Check that the **Vault** extension is enabled (Database → Extensions → `supabase_vault`). It is on by default in new projects and is needed for Always-on keys.
@@ -222,7 +224,8 @@ All user tables have `user_id` and **row-level security** limiting access to `au
 | `connection_imports`, `connections`, `outreach_drafts` | LinkedIn export imports, normalized connections (grouped by `company_key`), and outreach drafts (referral asks, follow-ups, connection notes) with `sent_at`. |
 | `job_sources`, `inbound_emails` | Followed careers pages, and metadata (sender, subject, jobs found) of forwarded alert emails. Email bodies are never stored. |
 | `stories`, `interview_preps`, `practice_answers`, `offers` | STAR story bank, prep packs, practice feedback, offers with negotiation plans. |
-| `content_posts`, `weekly_plans`, `agent_runs` | Post ideas and drafts, Career Coach plans, and a run log used for Starter limits. |
+| `content_posts`, `weekly_plans`, `agent_runs` | Post ideas and drafts, Career Coach plans, and a log of agent runs. |
+| `starter_limits`, `starter_usage` | Starter daily limits per agent, and the ledger of claimed Starter runs. Users can read their own usage but never write it; see `claim_starter_runs()` below. |
 | `application_profiles` | Contact details, links, current role and countries the user can work in, for filling application forms. No demographic data. |
 | `referral_packets` | Referral packet content, an unguessable `token`, status (`generating` → `draft` → `live` / `revoked`), view counts and expiry. Users can't change the token or views. |
 | `organizations`, `org_members`, `org_invites` | Outplacement programs and recruiting teams, membership roles (`owner` / `admin` / `member`, plus each member's `share_progress` choice) and invite links. `seat_limit`, `sponsorship_ends_at` and `verified` are set by Offerwing staff (service role) only; the Vault secret id is not selectable by users. |
@@ -230,6 +233,7 @@ All user tables have `user_id` and **row-level security** limiting access to `au
 
 Security-definer functions:
 
+- `claim_starter_runs(agent, count)` claims Starter runs for the signed-in user and returns the ids it granted, counting and inserting under one advisory lock so parallel requests can't overshoot. Limits come from `starter_limits`, not from the caller. `starter_runs_left(agent)` reports what's left today (UTC). `release_starter_runs(ids)` gives back runs whose model call failed and is service-role only. Run tables (`job_matches`, `application_kits`, ...) are never counted for limits, because users can edit their own rows.
 - `set_ai_mode(mode, provider)` and `set_cloud_ai_key(provider, key)` write to `ai_settings` and to **Vault** (`vault.create_secret` / `update_secret`). Switching away from cloud mode deletes the secret immediately.
 - `get_user_ai_key(user_id)` reads from `vault.decrypted_secrets`. It can only be executed by the service role, and the key is only ever held in server memory for the length of a call.
 - `purge_stale_data()` (service role only, run daily by `/api/cron/cleanup`) deletes imported connections not re-imported within 90 days unless they're on a referral list, and inbound email records after 30 days.
@@ -275,7 +279,7 @@ Users choose how AI is powered during onboarding and can change it any time in S
 
 | Mode | Key location | Status |
 |---|---|---|
-| **Starter** (default) | Offerwing's own key (`OFFERWING_STARTER_OPENAI_API_KEY` or `OFFERWING_STARTER_ANTHROPIC_API_KEY`) | Daily limits per user, e.g. **2** profile audits, **20** job matches, **5** application kits, **20** outreach drafts, **5** prep packs, **3** content plans, **3** weekly plans (see `lib/llm/quota.ts` and each agent module) |
+| **Starter** (default) | Offerwing's own key (`OFFERWING_STARTER_OPENAI_API_KEY` or `OFFERWING_STARTER_ANTHROPIC_API_KEY`) | Daily limits per user (reset at 00:00 UTC), e.g. **2** profile audits, **20** job matches, **5** application kits, **20** outreach drafts, **5** prep packs, **3** content plans, **3** weekly plans. The database table `starter_limits` is the authority; `lib/llm/starter-limits.ts` mirrors it for messages and a test keeps them equal. A failed model call gives its run back |
 | **Always-on** (`cloud`) | User's own OpenAI / Anthropic / Gemini key, encrypted in Supabase Vault | Unlimited, limited only by the user's own provider account |
 | **Private** | User's key kept only in the browser extension | Job scoring and form-answer drafts run in the extension, straight from the browser to the provider. Web-only agents explain that they need Starter or Always-on. |
 | **Sponsored** | An outplacement organization's key, encrypted in Vault | Applies to Starter-mode members of an active outplacement program. Recorded as `cloud` runs, so Starter limits don't apply; the sponsor controls spend with limits at its provider. Needs `SUPABASE_SERVICE_ROLE_KEY`. |

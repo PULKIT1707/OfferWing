@@ -89,7 +89,7 @@ export async function createReferralPacket(jobId: string, connectionId: string |
         sourceText,
       );
       // Points we can't trace to the documents never reach the page; the user sees what was removed.
-      const unsupported = new Set(verification.flagged.filter((f) => f.where.startsWith("Fit point") && f.reasons.some((r) => r.startsWith("Supporting quote"))).map((f) => f.text));
+      const unsupported = new Set(verification.flagged.filter((f) => f.where.startsWith("Fit point") && f.reasons.some((r) => r.startsWith("Supporting quote not found"))).map((f) => f.text));
       await db
         .from("referral_packets")
         .update({

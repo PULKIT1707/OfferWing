@@ -32,6 +32,7 @@ export default async function SettingsPage() {
       documents={(docs ?? []) as CareerDocument[]}
       alertAddress={`${profile?.alert_alias}@${ALERT_DOMAIN()}`}
       jobSources={(sources ?? []) as JobSource[]}
+      titleExclude={((search as { title_exclude?: string[] } | null)?.title_exclude) ?? []}
       inboundEmails={(emails ?? []) as InboundEmailRow[]}
       sponsorships={memberships
         .filter((m) => m.kind === "outplacement" && m.role === "member")

@@ -76,7 +76,7 @@ export function PacketEditor({ packet, generating, shareUrl }: { packet: PacketR
   }
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
   const job = packet.jobs;
-  const removed = packet.verification?.flagged.filter((f) => f.where.startsWith("Fit point") && f.reasons.some((r) => r.startsWith("Supporting quote"))) ?? [];
+  const removed = packet.verification?.flagged.filter((f) => f.where.startsWith("Fit point") && f.reasons.some((r) => r.startsWith("Supporting quote not found"))) ?? [];
   const numberFlags = packet.verification?.flagged.filter((f) => f.reasons.some((r) => r.startsWith("Number"))) ?? [];
 
   const save = (publish: boolean) =>

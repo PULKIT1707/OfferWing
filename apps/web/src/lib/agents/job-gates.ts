@@ -35,7 +35,7 @@ export function detectDealbreakers(description: string, prefs: GatePrefs): strin
 }
 
 export type Liveness = "live" | "closed" | "unknown";
-type PostingRef = { kind: "greenhouse" | "lever" | "ashby"; board: string; id: string };
+type PostingRef = { kind: "greenhouse" | "lever" | "ashby" | "smartrecruiters"; board: string; id: string };
 
 const SLUG = /^[A-Za-z0-9._-]{1,100}$/;
 
@@ -59,6 +59,8 @@ export function parsePostingUrl(input: string | null | undefined): PostingRef | 
     ref = { kind: "lever", board: seg[0], id: seg[1] };
   } else if (host === "jobs.ashbyhq.com" && seg.length >= 2 && /^[0-9a-f-]{36}$/i.test(seg[1])) {
     ref = { kind: "ashby", board: seg[0], id: seg[1].toLowerCase() };
+  } else if (host === "jobs.smartrecruiters.com" && /^\d+/.test(seg[1] ?? "")) {
+    ref = { kind: "smartrecruiters", board: seg[0], id: seg[1].match(/^\d+/)![0] };
   }
   return ref && SLUG.test(ref.board) ? ref : null;
 }
@@ -74,11 +76,13 @@ export async function checkPostingLive(url: string | null | undefined, fetchImpl
   const board = encodeURIComponent(ref.board);
   const init: RequestInit = { headers: { Accept: "application/json", "User-Agent": "Offerwing posting check" }, redirect: "manual", signal: AbortSignal.timeout(timeoutMs) };
   try {
-    if (ref.kind === "greenhouse" || ref.kind === "lever") {
+    if (ref.kind !== "ashby") {
       const api =
         ref.kind === "greenhouse"
           ? `https://boards-api.greenhouse.io/v1/boards/${board}/jobs/${ref.id}`
-          : `https://api.lever.co/v0/postings/${board}/${ref.id}`;
+          : ref.kind === "lever"
+            ? `https://api.lever.co/v0/postings/${board}/${ref.id}`
+            : `https://api.smartrecruiters.com/v1/companies/${board}/postings/${ref.id}`;
       const res = await fetchImpl(api, init);
       if (res.status === 404) return "closed";
       return res.ok ? "live" : "unknown";
@@ -92,6 +96,18 @@ export async function checkPostingLive(url: string | null | undefined, fetchImpl
   } catch {
     return "unknown";
   }
+}
+
+// Jobs found on a followed board keep the ATS's own id ("greenhouse:stripe:123") even when their URL
+// points at the company's site (stripe.com/jobs?gh_jid=123). Rebuilds a URL the checker recognizes.
+export function postingUrlFromExternalId(externalId: string | null | undefined): string | null {
+  const [kind, board, id] = (externalId ?? "").split(":");
+  if (!board || !id || !/^[A-Za-z0-9._-]{1,100}$/.test(board)) return null;
+  if (kind === "greenhouse") return `https://boards.greenhouse.io/${board}/jobs/${id}`;
+  if (kind === "lever") return `https://jobs.lever.co/${board}/${id}`;
+  if (kind === "ashby") return `https://jobs.ashbyhq.com/${board}/${id}`;
+  if (kind === "smartrecruiters") return `https://jobs.smartrecruiters.com/${board}/${id}`;
+  return null;
 }
 
 // Runs checkPostingLive over many URLs with a small concurrency limit.

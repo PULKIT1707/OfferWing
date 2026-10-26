@@ -5,7 +5,7 @@ import { OPEN_STAGES, sameCompany } from "@/lib/dashboard";
 import { allowedRuns, credentialForAgent } from "@/lib/llm/agent-credential";
 import { releaseStarterRuns } from "@/lib/llm/quota";
 import { modelFor } from "@/lib/llm/models";
-import { checkPostingsLive } from "./job-gates";
+import { checkPostingsLive, parsePostingUrl, postingUrlFromExternalId } from "./job-gates";
 import { isMatchRunning } from "./job-match";
 import { runJobMatches } from "./job-match-runner";
 
@@ -19,7 +19,7 @@ export async function queueJobMatches(
   // Client for the background run; defaults to the caller's client.
   backgroundClient: () => Promise<SupabaseClient> = async () => supabase,
 ): Promise<StartResult> {
-  let query = supabase.from("jobs").select("id, title, company, url, description, fit_score, stage");
+  let query = supabase.from("jobs").select("id, title, company, url, external_id, description, fit_score, stage");
   // "unscored" leaves out jobs without a description; they can't be scored and aren't counted in the UI.
   query =
     jobIds === "unscored"
@@ -44,7 +44,7 @@ export async function queueJobMatches(
     return !reason;
   });
   // A closed posting shouldn't cost an AI run: ask Greenhouse, Lever or Ashby before scoring.
-  const liveness = await checkPostingsLive(eligible.map((j) => j.url));
+  const liveness = await checkPostingsLive(eligible.map((j) => (parsePostingUrl(j.url) ? j.url : postingUrlFromExternalId(j.external_id) ?? j.url)));
   const open = eligible.filter((j, i) => {
     if (liveness[i] !== "closed") return true;
     skipped.push({ title: `${j.title} at ${j.company}`, reason: "the posting has closed" });

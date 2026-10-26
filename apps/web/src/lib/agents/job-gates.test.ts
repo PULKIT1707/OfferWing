@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkPostingLive, checkPostingsLive, detectDealbreakers, parsePostingUrl } from "./job-gates";
+import { checkPostingLive, checkPostingsLive, detectDealbreakers, parsePostingUrl, postingUrlFromExternalId } from "./job-gates";
 
 const sponsor = { needs_sponsorship: true, work_modes: ["remote", "hybrid"] };
 const remoteOnly = { needs_sponsorship: false, work_modes: ["remote"] };
@@ -107,5 +107,16 @@ describe("checkPostingLive", () => {
     });
     expect(out).toEqual(["unknown", "unknown"]);
     expect(calls).toBe(0);
+  });
+});
+
+describe("postingUrlFromExternalId", () => {
+  it("rebuilds checkable URLs from stored ATS ids", () => {
+    expect(postingUrlFromExternalId("greenhouse:stripe:8172508")).toBe("https://boards.greenhouse.io/stripe/jobs/8172508");
+    expect(parsePostingUrl(postingUrlFromExternalId("greenhouse:stripe:8172508"))).toEqual({ kind: "greenhouse", board: "stripe", id: "8172508" });
+    expect(parsePostingUrl(postingUrlFromExternalId("smartrecruiters:Bosch:744000157846319"))).toEqual({ kind: "smartrecruiters", board: "Bosch", id: "744000157846319" });
+    expect(postingUrlFromExternalId("workable:hf:AB12")).toBeNull();
+    expect(postingUrlFromExternalId("greenhouse:bad/board:1")).toBeNull();
+    expect(postingUrlFromExternalId(null)).toBeNull();
   });
 });

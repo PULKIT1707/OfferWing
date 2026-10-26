@@ -4,13 +4,18 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { loadPrefs, pollSources } from "@/lib/discovery";
 import { fetchBoard, nameFromToken, parseCareersUrl } from "@/lib/job-sources";
+import { MAX_TITLE_EXCLUDE } from "@/lib/source-kinds";
 
 const SOURCE_COLUMNS = "id, user_id, kind, board_token, company_name, only_matching";
 const MAX_SOURCES = 50;
 
 export async function addJobSource(input: string): Promise<{ error?: string; added?: number; companyName?: string }> {
   const parsed = parseCareersUrl(input);
-  if (!parsed) return { error: "Paste a Greenhouse, Lever or Ashby careers link, like boards.greenhouse.io/stripe or jobs.lever.co/company." };
+  if (!parsed) {
+    return {
+      error: "Paste a careers link from Greenhouse, Lever, Ashby, SmartRecruiters, Workable or Recruitee, like boards.greenhouse.io/stripe or apply.workable.com/company.",
+    };
+  }
   const { supabase, userId } = await requireUser();
 
   const { count } = await supabase.from("job_sources").select("id", { count: "exact", head: true });
@@ -35,6 +40,17 @@ export async function addJobSource(input: string): Promise<{ error?: string; add
   const { added } = await pollSources(supabase, [source], await loadPrefs(supabase, [userId]));
   revalidatePath("/dashboard", "layout");
   return { added, companyName };
+}
+
+// Words that keep a title out of the inbox, e.g. "intern", "contract", "interior".
+export async function saveTitleExclusions(words: string[]): Promise<{ error?: string; saved?: string[] }> {
+  const clean = [...new Set(words.map((w) => w.trim().toLowerCase().slice(0, 40)).filter(Boolean))];
+  if (clean.length > MAX_TITLE_EXCLUDE) return { error: `Keep it to ${MAX_TITLE_EXCLUDE} words or fewer.` };
+  const { supabase, userId } = await requireUser();
+  const { error } = await supabase.from("search_profiles").update({ title_exclude: clean }).eq("user_id", userId);
+  if (error) return { error: "Couldn't save those words. Please try again." };
+  revalidatePath("/dashboard/settings");
+  return { saved: clean };
 }
 
 export async function removeJobSource(id: string): Promise<{ error?: string }> {

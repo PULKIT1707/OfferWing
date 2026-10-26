@@ -80,7 +80,8 @@ OfferWing/
 │       ├── 0011_content.sql       content_posts, agent_runs (Starter limits)
 │       ├── 0012_weekly_plans.sql  weekly_plans
 │       ├── 0013–0017              autofill, referral packets, organizations, talent marketplace, onboarding prefill
-│       └── 0018_starter_usage_ledger.sql  starter_limits, starter_usage, claim_starter_runs()
+│       ├── 0018_starter_usage_ledger.sql  starter_limits, starter_usage, claim_starter_runs()
+│       └── 0019_more_job_sources.sql      SmartRecruiters / Workable / Recruitee boards, search_profiles.title_exclude
 ├── .github/workflows/ci.yml       Lint, type check, tests and extension build
 └── apps/
     ├── extension/                 Chrome MV3 side panel (esbuild + React); see apps/extension/README.md
@@ -127,7 +128,7 @@ npm install
 ### 2. Set up Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Apply the migrations **in order** (`0001` → `0018`). Either:
+2. Apply the migrations **in order** (`0001` → `0019`). Either:
    - paste each file from `supabase/migrations/` into **SQL Editor** and run it, or
    - with the Supabase CLI: `supabase link --project-ref <ref>` then `supabase db push` from the repo root.
 3. Check that the **Vault** extension is enabled (Database → Extensions → `supabase_vault`). It is on by default in new projects and is needed for Always-on keys.
@@ -260,7 +261,7 @@ Each agent lives in `src/lib/agents/` as a system prompt, a context builder, a Z
 | Application Tailor | `application-tailor.ts` | standard | Tailored resume where each bullet carries an `evidence` quote, cover note (150–250 words), connection note (≤ 300 characters), screening answers, change log, `needs_input` |
 | Truthfulness check | `truthfulness.ts` | — (deterministic) | Checks the kit against the source documents and flags invented companies, titles, numbers, unsupported bullets and unverified skills |
 | Referral Scout | `referral-scout.ts` | — / standard | Heuristic ranking of connections per company (role similarity, seniority, recruiters, recent messages), then LLM-drafted referral asks |
-| Job Discovery | `lib/discovery.ts`, `job-alerts.ts`, `job-sources.ts` | — (deterministic) | Parses forwarded LinkedIn alert emails and polls Greenhouse / Lever / Ashby boards; matches titles to target roles by head noun; dedupes by source ID and URL; skips avoided companies |
+| Job Discovery | `lib/discovery.ts`, `job-alerts.ts`, `job-sources.ts` | — (deterministic) | Parses forwarded LinkedIn alert emails and polls Greenhouse / Lever / Ashby / SmartRecruiters / Workable / Recruitee boards (one `PROVIDERS` entry each; every request is HTTPS to the provider's own API host, with no redirects, a timeout and a size cap). Matches titles to target roles by head noun and drops titles with the user's excluded words; dedupes by source ID and by URL with tracking parameters removed; skips avoided companies. SmartRecruiters descriptions are fetched per new posting, at most 25 per poll |
 | Outreach | `outreach.ts` | standard | Referral asks, follow-ups (at most two) and connection notes (≤ 300 characters) |
 | Interview coach | `interviews.ts` | standard | Story bank extraction, prep packs (company brief with web research on Anthropic, likely questions matched to stories, "tell me about yourself", questions to ask), practice feedback |
 | Negotiation | `negotiation.ts` | premium | Assessment, leverage, a concrete ask, email script, call points and fallbacks. No invented competing offers. |

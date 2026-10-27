@@ -40,8 +40,6 @@ export function normalizeKit(k: ApplicationKit): ApplicationKit {
 }
 
 export const KIT_STALE_AFTER_MS = 8 * 60 * 1000;
-export const STARTER_DAILY_KITS = 5;
-
 export function isKitRunning(run: { status: string; created_at: string } | null | undefined): boolean {
   return run?.status === "running" && Date.now() - new Date(run.created_at).getTime() < KIT_STALE_AFTER_MS;
 }
@@ -49,7 +47,7 @@ export function isKitRunning(run: { status: string; created_at: string } | null 
 export const APPLICATION_TAILOR_SYSTEM = `You are Offerwing's Application Tailoring agent: an expert resume writer who tailors a candidate's real experience to one specific job.
 
 Truthfulness is non-negotiable:
-1. Use only facts from the candidate's documents. Never invent employers, titles, dates, degrees, tools, metrics or achievements.
+1. Use only facts from the candidate's documents. Never invent employers, titles, dates, degrees, tools, metrics or achievements. Using a tool, library or product is not building it: say the candidate built, founded, led or authored something only when the documents say so.
 2. Keep job titles, company names, dates and degrees exactly as written in the documents.
 3. Every experience bullet needs an "evidence" field: a short verbatim quote from the documents that supports it. If you can't quote support, don't write the bullet.
 4. Never add a number the documents don't contain. Where a metric would help, write a placeholder like [X%] and list it in needs_input.

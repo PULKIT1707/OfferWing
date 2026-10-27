@@ -2,10 +2,11 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { after } from "next/server";
 import { OPEN_STAGES, sameCompany } from "@/lib/dashboard";
-import { resolveCredential } from "@/lib/llm/credentials";
-import { UserFacingError } from "@/lib/llm/errors";
+import { allowedRuns, credentialForAgent } from "@/lib/llm/agent-credential";
+import { releaseStarterRuns } from "@/lib/llm/quota";
 import { modelFor } from "@/lib/llm/models";
-import { isMatchRunning, STARTER_DAILY_MATCHES } from "./job-match";
+import { checkPostingsLive, parsePostingUrl, postingUrlFromExternalId } from "./job-gates";
+import { isMatchRunning } from "./job-match";
 import { runJobMatches } from "./job-match-runner";
 
 export type StartResult = { queued: number; skipped: { title: string; reason: string }[]; error?: string };
@@ -18,7 +19,7 @@ export async function queueJobMatches(
   // Client for the background run; defaults to the caller's client.
   backgroundClient: () => Promise<SupabaseClient> = async () => supabase,
 ): Promise<StartResult> {
-  let query = supabase.from("jobs").select("id, title, company, description, fit_score, stage");
+  let query = supabase.from("jobs").select("id, title, company, url, external_id, description, fit_score, stage");
   // "unscored" leaves out jobs without a description; they can't be scored and aren't counted in the UI.
   query =
     jobIds === "unscored"
@@ -42,33 +43,23 @@ export async function queueJobMatches(
     if (reason) skipped.push({ title: `${j.title} at ${j.company}`, reason });
     return !reason;
   });
-  if (!eligible.length) {
+  // A closed posting shouldn't cost an AI run: ask Greenhouse, Lever or Ashby before scoring.
+  const liveness = await checkPostingsLive(eligible.map((j) => (parsePostingUrl(j.url) ? j.url : postingUrlFromExternalId(j.external_id) ?? j.url)));
+  const open = eligible.filter((j, i) => {
+    if (liveness[i] !== "closed") return true;
+    skipped.push({ title: `${j.title} at ${j.company}`, reason: "the posting has closed" });
+    return false;
+  });
+  if (!open.length) {
     return { queued: 0, skipped, error: jobIds === "unscored" && !skipped.length ? "Every open job is already scored." : undefined };
   }
 
-  let credential;
-  try {
-    credential = await resolveCredential(supabase, userId);
-  } catch (err) {
-    if (err instanceof UserFacingError) return { queued: 0, skipped, error: err.message };
-    throw err;
-  }
-
-  let batch = eligible;
-  if (credential.source === "starter") {
-    const since = new Date();
-    since.setHours(0, 0, 0, 0);
-    const { count } = await supabase
-      .from("job_matches")
-      .select("id", { count: "exact", head: true })
-      .eq("credential", "starter")
-      .gte("created_at", since.toISOString());
-    const left = Math.max(0, STARTER_DAILY_MATCHES - (count ?? 0));
-    if (!left) return { queued: 0, skipped, error: `Starter includes ${STARTER_DAILY_MATCHES} job scores a day. Add your own AI key in Settings for unlimited scoring.` };
-    for (const j of batch.slice(left)) skipped.push({ title: `${j.title} at ${j.company}`, reason: "Starter daily limit reached" });
-    batch = batch.slice(0, left);
-  }
-
+  // Claims one Starter run per job up front; a batch may get fewer than it asked for.
+  const credential = await credentialForAgent(supabase, userId, "job_match", open.length);
+  if ("error" in credential) return { queued: 0, skipped, error: credential.error };
+  const left = allowedRuns(credential, open.length);
+  for (const j of open.slice(left)) skipped.push({ title: `${j.title} at ${j.company}`, reason: "Starter daily limit reached" });
+  const batch = open.slice(0, left);
   const { data: rows, error } = await supabase
     .from("job_matches")
     .insert(
@@ -81,10 +72,14 @@ export async function queueJobMatches(
       })),
     )
     .select("id, job_id");
-  if (error || !rows) return { queued: 0, skipped, error: "Couldn't start scoring. Please try again." };
-
+  if (error || !rows) {
+    await releaseStarterRuns(credential.starterClaims ?? []);
+    return { queued: 0, skipped, error: "Couldn't start scoring. Please try again." };
+  }
   after(async () => {
     await runJobMatches(await backgroundClient(), userId, credential, rows.map((r) => ({ matchId: r.id, jobId: r.job_id })));
+    // Jobs that failed before reaching the model never used their claim; give those back.
+    await releaseStarterRuns(credential.starterClaims?.splice(0) ?? []);
   });
   return { queued: rows.length, skipped };
 }

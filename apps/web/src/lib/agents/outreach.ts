@@ -12,7 +12,6 @@ export const outreachDraftSchema = z.object({
 });
 export type OutreachDraft = z.infer<typeof outreachDraftSchema>;
 
-export const STARTER_DAILY_DRAFTS = 20;
 // LinkedIn caps invitations at roughly 100 a week; staying below keeps accounts in good standing.
 export const WEEKLY_INVITE_BUDGET = 80;
 export const MAX_FOLLOW_UPS = 2;

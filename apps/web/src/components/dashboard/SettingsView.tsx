@@ -81,6 +81,7 @@ export function SettingsView({
   inboundEmails,
   application,
   sponsorships,
+  titleExclude,
 }: {
   userId: string;
   profile: SearchProfile;
@@ -91,6 +92,7 @@ export function SettingsView({
   inboundEmails: InboundEmailRow[];
   application: ApplicationProfile;
   sponsorships: SponsorMembership[];
+  titleExclude: string[];
 }) {
   const [profile, setProfile] = useState(initialProfile);
   const [ai, setAi] = useState(initialAi);
@@ -138,7 +140,7 @@ export function SettingsView({
           <ApplicationProfileForm initial={application} onSaved={() => flag("applications")} />
         </Section>
         <Section id="sources" title="Job sources" subtitle="Where new jobs come from. Everything lands in your pipeline inbox.">
-          <JobSources alertAddress={alertAddress} sources={jobSources} emails={inboundEmails} />
+          <JobSources alertAddress={alertAddress} sources={jobSources} emails={inboundEmails} titleExclude={titleExclude} />
         </Section>
         <Section
           id="ai"

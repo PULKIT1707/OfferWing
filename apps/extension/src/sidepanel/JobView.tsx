@@ -91,6 +91,8 @@ export function JobView({ me, page, lookup, refresh }: { me: Me; page: Extracted
           </div>
           <p className="channel">{CHANNEL[m.recommended_channel]}: <span className="muted">{m.channel_reason}</span></p>
           {m.preference_conflicts.length > 0 && <Notice tone="warn">{m.preference_conflicts.join(" · ")}</Notice>}
+          {m.legitimacy === "suspicious" && <Notice tone="warn">This posting looks suspicious. Check it on the company&apos;s own careers page before you apply.</Notice>}
+          {m.confidence === "low" && <p className="muted small">Low confidence: key evidence is missing, so treat this score as a rough guess.</p>}
           {m.gaps.length > 0 && (
             <>
               <p className="label">Gaps</p>

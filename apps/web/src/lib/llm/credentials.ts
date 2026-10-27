@@ -7,9 +7,10 @@ import { UserFacingError } from "./errors";
 
 // Sponsored runs (an outplacement organization's key) are recorded as "cloud": the member's own
 // Starter limits don't apply, and the sponsor controls spend with limits at their AI provider.
-export type Credential = { source: "starter" | "cloud"; provider: Provider; apiKey: string; sponsor?: string };
+// starterClaims: ledger ids from claim_starter_runs(), one per model call this credential may make.
+// generateStructured() uses one per call and gives it back if the call fails.
+export type Credential = { source: "starter" | "cloud"; provider: Provider; apiKey: string; sponsor?: string; starterClaims?: string[] };
 
-export const STARTER_DAILY_AUDITS = 2;
 
 // Picks the key an agent run should use, based on the user's AI mode.
 export async function resolveCredential(supabase: SupabaseClient, userId: string): Promise<Credential> {

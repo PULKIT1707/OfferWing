@@ -6,6 +6,7 @@ import type { Credential } from "@/lib/llm/credentials";
 import { UserFacingError } from "@/lib/llm/errors";
 import { generateStructured } from "@/lib/llm/generate";
 import { withDefaults } from "@/lib/onboarding";
+import { detectDealbreakers } from "./job-gates";
 import { buildCandidateContext, buildJobPrompt, JOB_MATCH_SYSTEM, jobMatchSchema, normalizeMatch } from "./job-match";
 
 const CONCURRENCY = 3;
@@ -19,6 +20,7 @@ export async function runJobMatches(db: SupabaseClient, userId: string, credenti
   };
 
   let context: string;
+  let prefs: ReturnType<typeof withDefaults>;
   let jobs: { id: string; title: string; company: string; location: string | null; description: string | null }[];
   let contacts: { company: string | null }[];
   try {
@@ -31,7 +33,8 @@ export async function runJobMatches(db: SupabaseClient, userId: string, credenti
     // The resume usually has the fullest detail; fall back to the LinkedIn export.
     const doc = pickDocument(docs, "resume", "linkedin_pdf");
     const careerText = doc ? await readDocumentText(db, doc) : null;
-    context = buildCandidateContext(withDefaults(search), careerText);
+    prefs = withDefaults(search);
+    context = buildCandidateContext(prefs, careerText);
     jobs = jobsRes.data ?? [];
     contacts = contactsRes.data ?? [];
   } catch (err) {
@@ -46,16 +49,17 @@ export async function runJobMatches(db: SupabaseClient, userId: string, credenti
       try {
         if (!job?.description) throw new UserFacingError("Paste the job description first.");
         const people = contacts.filter((c) => sameCompany(c.company, job.company)).length;
+        const conflicts = detectDealbreakers(job.description, prefs);
         const result = await generateStructured({
           credential,
           tier: "fast",
           system: JOB_MATCH_SYSTEM,
           context,
-          prompt: buildJobPrompt({ ...job, description: job.description.slice(0, 20_000) }, people),
+          prompt: buildJobPrompt({ ...job, description: job.description.slice(0, 20_000) }, people, conflicts),
           schema: jobMatchSchema,
           schemaName: "job_match",
         });
-        const match = normalizeMatch(result.data);
+        const match = normalizeMatch(result.data, conflicts);
         await Promise.all([
           db
             .from("job_matches")

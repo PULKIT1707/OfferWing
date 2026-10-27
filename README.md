@@ -40,7 +40,7 @@ AI job-search agents for LinkedIn users. Offerwing audits your profile, scores j
 | Outreach | `/dashboard/outreach` | Follow-ups due (max two per person), people to ask for referrals, connection notes for recruiters and hiring managers, a weekly invite budget and recent drafts. You send everything yourself. |
 | Content | `/dashboard/content` | A two-week post plan, drafts in your voice with alternative hooks, "Open in LinkedIn" pre-filled posts and comment ideas for posts you paste. |
 | Interviews & offers | `/dashboard/interviews` | A STAR story bank built from your resume, per-job prep packs (with web research on Anthropic), practice feedback, offer comparison and negotiation plans. |
-| Insights | `/dashboard/insights` | Pipeline and activity metrics. |
+| Insights | `/dashboard/insights` | Pipeline and activity metrics, plus a calibration view: response and interview rates by fit-score band, with a note when a lower band is doing better than a higher one (advisory only; it never changes scoring). |
 | Settings | `/dashboard/settings` | Application details (what forms ask for), job sources (alert forwarding address and followed careers pages), AI mode and provider key, outplacement program sharing, export all your data as JSON, delete your account. |
 | Organizations | `/org`, `/org/[id]`, `/join/[code]` | **Outplacement**: an employer invites leavers with seat-limited invite links, sponsors their AI with its own key (Vault), brands the experience and sees program totals (only once 5 people join) plus individual progress for people who opt in. **Recruiting**: a team Offerwing has verified searches the talent marketplace and sends intro requests. |
 | Browser extension | `apps/extension` | Chrome side panel on LinkedIn job, profile and company pages: fit score, who you know, save to pipeline, screening answers. On application forms (Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Workable, or any site after a one-time permission) it **fills the form** from your application details, the job's kit and your resume, drafts answers to open questions, and marks the job applied. It never submits, and never touches demographic or consent questions. Reads a page only when you click. |
@@ -78,7 +78,10 @@ OfferWing/
 │       ├── 0009_outreach.sql      follow-ups and connection notes, send tracking
 │       ├── 0010_interviews_offers.sql stories, interview_preps, practice_answers, offers
 │       ├── 0011_content.sql       content_posts, agent_runs (Starter limits)
-│       └── 0012_weekly_plans.sql  weekly_plans
+│       ├── 0012_weekly_plans.sql  weekly_plans
+│       ├── 0013–0017              autofill, referral packets, organizations, talent marketplace, onboarding prefill
+│       ├── 0018_starter_usage_ledger.sql  starter_limits, starter_usage, claim_starter_runs()
+│       └── 0019_more_job_sources.sql      SmartRecruiters / Workable / Recruitee boards, search_profiles.title_exclude
 ├── .github/workflows/ci.yml       Lint, type check, tests and extension build
 └── apps/
     ├── extension/                 Chrome MV3 side panel (esbuild + React); see apps/extension/README.md
@@ -125,7 +128,7 @@ npm install
 ### 2. Set up Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Apply the migrations **in order** (`0001` → `0012`). Either:
+2. Apply the migrations **in order** (`0001` → `0019`). Either:
    - paste each file from `supabase/migrations/` into **SQL Editor** and run it, or
    - with the Supabase CLI: `supabase link --project-ref <ref>` then `supabase db push` from the repo root.
 3. Check that the **Vault** extension is enabled (Database → Extensions → `supabase_vault`). It is on by default in new projects and is needed for Always-on keys.
@@ -222,7 +225,8 @@ All user tables have `user_id` and **row-level security** limiting access to `au
 | `connection_imports`, `connections`, `outreach_drafts` | LinkedIn export imports, normalized connections (grouped by `company_key`), and outreach drafts (referral asks, follow-ups, connection notes) with `sent_at`. |
 | `job_sources`, `inbound_emails` | Followed careers pages, and metadata (sender, subject, jobs found) of forwarded alert emails. Email bodies are never stored. |
 | `stories`, `interview_preps`, `practice_answers`, `offers` | STAR story bank, prep packs, practice feedback, offers with negotiation plans. |
-| `content_posts`, `weekly_plans`, `agent_runs` | Post ideas and drafts, Career Coach plans, and a run log used for Starter limits. |
+| `content_posts`, `weekly_plans`, `agent_runs` | Post ideas and drafts, Career Coach plans, and a log of agent runs. |
+| `starter_limits`, `starter_usage` | Starter daily limits per agent, and the ledger of claimed Starter runs. Users can read their own usage but never write it; see `claim_starter_runs()` below. |
 | `application_profiles` | Contact details, links, current role and countries the user can work in, for filling application forms. No demographic data. |
 | `referral_packets` | Referral packet content, an unguessable `token`, status (`generating` → `draft` → `live` / `revoked`), view counts and expiry. Users can't change the token or views. |
 | `organizations`, `org_members`, `org_invites` | Outplacement programs and recruiting teams, membership roles (`owner` / `admin` / `member`, plus each member's `share_progress` choice) and invite links. `seat_limit`, `sponsorship_ends_at` and `verified` are set by Offerwing staff (service role) only; the Vault secret id is not selectable by users. |
@@ -230,6 +234,7 @@ All user tables have `user_id` and **row-level security** limiting access to `au
 
 Security-definer functions:
 
+- `claim_starter_runs(agent, count)` claims Starter runs for the signed-in user and returns the ids it granted, counting and inserting under one advisory lock so parallel requests can't overshoot. Limits come from `starter_limits`, not from the caller. `starter_runs_left(agent)` reports what's left today (UTC). `release_starter_runs(ids)` gives back runs whose model call failed and is service-role only. Run tables (`job_matches`, `application_kits`, ...) are never counted for limits, because users can edit their own rows.
 - `set_ai_mode(mode, provider)` and `set_cloud_ai_key(provider, key)` write to `ai_settings` and to **Vault** (`vault.create_secret` / `update_secret`). Switching away from cloud mode deletes the secret immediately.
 - `get_user_ai_key(user_id)` reads from `vault.decrypted_secrets`. It can only be executed by the service role, and the key is only ever held in server memory for the length of a call.
 - `purge_stale_data()` (service role only, run daily by `/api/cron/cleanup`) deletes imported connections not re-imported within 90 days unless they're on a referral list, and inbound email records after 30 days.
@@ -252,11 +257,11 @@ Each agent lives in `src/lib/agents/` as a system prompt, a context builder, a Z
 | Agent | File | Tier | Output |
 |---|---|---|---|
 | Profile Optimizer | `profile-optimizer.ts` | premium | Overall and per-section scores, headline variants (keyword / value / proof), About draft (≤ 2,600 characters), experience rewrites, top 5 skills, keyword coverage, quick wins, `needs_input` placeholders |
-| Job Match | `job-match.ts`, `job-match-runner.ts` | fast | `fit_score` 0–100, verdict, matched requirements with evidence, gaps with honest framing, preference conflicts, red flags, keywords to mirror, recommended channel, talking points. Runs 3 at a time and skips jobs with no description or at excluded companies. |
+| Job Match | `job-match.ts`, `job-match-runner.ts`, `job-gates.ts` | fast | `fit_score` 0–100 with the verdict forced to its score band, matched requirements with evidence, gaps, preference conflicts, a **legitimacy** tier judged separately from fit (it never moves the score), **evidence** status per dimension and a **confidence** tier computed from it in code, up to 3 open questions, any text in the posting that tried to instruct the AI, keywords to mirror, recommended channel, talking points. Before any AI run, code skips jobs with no description, at excluded companies, or whose Greenhouse / Lever / Ashby posting has closed, and adds explicit conflicts ("we don't sponsor" for someone who needs sponsorship, "not remote" for remote-only searches). Runs 3 at a time. Results carry `prompt_version`. |
 | Application Tailor | `application-tailor.ts` | standard | Tailored resume where each bullet carries an `evidence` quote, cover note (150–250 words), connection note (≤ 300 characters), screening answers, change log, `needs_input` |
 | Truthfulness check | `truthfulness.ts` | — (deterministic) | Checks the kit against the source documents and flags invented companies, titles, numbers, unsupported bullets and unverified skills |
 | Referral Scout | `referral-scout.ts` | — / standard | Heuristic ranking of connections per company (role similarity, seniority, recruiters, recent messages), then LLM-drafted referral asks |
-| Job Discovery | `lib/discovery.ts`, `job-alerts.ts`, `job-sources.ts` | — (deterministic) | Parses forwarded LinkedIn alert emails and polls Greenhouse / Lever / Ashby boards; matches titles to target roles by head noun; dedupes by source ID and URL; skips avoided companies |
+| Job Discovery | `lib/discovery.ts`, `job-alerts.ts`, `job-sources.ts` | — (deterministic) | Parses forwarded LinkedIn alert emails and polls Greenhouse / Lever / Ashby / SmartRecruiters / Workable / Recruitee boards (one `PROVIDERS` entry each; every request is HTTPS to the provider's own API host, with no redirects, a timeout and a size cap). Matches titles to target roles by head noun and drops titles with the user's excluded words; dedupes by source ID and by URL with tracking parameters removed; skips avoided companies. SmartRecruiters descriptions are fetched per new posting, at most 25 per poll |
 | Outreach | `outreach.ts` | standard | Referral asks, follow-ups (at most two) and connection notes (≤ 300 characters) |
 | Interview coach | `interviews.ts` | standard | Story bank extraction, prep packs (company brief with web research on Anthropic, likely questions matched to stories, "tell me about yourself", questions to ask), practice feedback |
 | Negotiation | `negotiation.ts` | premium | Assessment, leverage, a concrete ask, email script, call points and fallbacks. No invented competing offers. |
@@ -275,7 +280,7 @@ Users choose how AI is powered during onboarding and can change it any time in S
 
 | Mode | Key location | Status |
 |---|---|---|
-| **Starter** (default) | Offerwing's own key (`OFFERWING_STARTER_OPENAI_API_KEY` or `OFFERWING_STARTER_ANTHROPIC_API_KEY`) | Daily limits per user, e.g. **2** profile audits, **20** job matches, **5** application kits, **20** outreach drafts, **5** prep packs, **3** content plans, **3** weekly plans (see `lib/llm/quota.ts` and each agent module) |
+| **Starter** (default) | Offerwing's own key (`OFFERWING_STARTER_OPENAI_API_KEY` or `OFFERWING_STARTER_ANTHROPIC_API_KEY`) | Daily limits per user (reset at 00:00 UTC), e.g. **2** profile audits, **20** job matches, **5** application kits, **20** outreach drafts, **5** prep packs, **3** content plans, **3** weekly plans. The database table `starter_limits` is the authority; `lib/llm/starter-limits.ts` mirrors it for messages and a test keeps them equal. A failed model call gives its run back |
 | **Always-on** (`cloud`) | User's own OpenAI / Anthropic / Gemini key, encrypted in Supabase Vault | Unlimited, limited only by the user's own provider account |
 | **Private** | User's key kept only in the browser extension | Job scoring and form-answer drafts run in the extension, straight from the browser to the provider. Web-only agents explain that they need Starter or Always-on. |
 | **Sponsored** | An outplacement organization's key, encrypted in Vault | Applies to Starter-mode members of an active outplacement program. Recorded as `cloud` runs, so Starter limits don't apply; the sponsor controls spend with limits at its provider. Needs `SUPABASE_SERVICE_ROLE_KEY`. |
@@ -317,6 +322,7 @@ Run from `apps/web`:
 | `npm run lint` | ESLint (`eslint-config-next`) |
 | `npm test` | Unit tests (Vitest) for parsers, scoring, the truthfulness check and date handling |
 | `npm run typecheck` | `tsc --noEmit` (run `npx next typegen` first on a fresh checkout) |
+| `npm run eval:golden` | Golden-set eval for Job Match. Offline by default; with `OFFERWING_EVAL_<PROVIDER>_API_KEY` set it scores the synthetic cases on real models and writes a report to `evals/results/` (see `apps/web/evals/README.md`) |
 
 ## Deployment
 

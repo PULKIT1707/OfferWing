@@ -2,6 +2,7 @@ import { BarChart3 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
+import { calibrate, MIN_APPLIED } from "@/lib/calibration";
 import { CHANNELS, JOB_COLUMNS, labelOf, type Job } from "@/lib/dashboard";
 
 export const metadata: Metadata = { title: "Insights · Offerwing" };
@@ -31,6 +32,8 @@ export default async function InsightsPage() {
     return { id, total: js.length, responded: js.filter((j) => reached(j) >= 2).length };
   }).filter((c) => c.total > 0);
   const untagged = applied.filter((j) => !j.channel).length;
+  const cal = calibrate(jobs.map((j) => ({ fit_score: j.fit_score, reached: reached(j) })));
+  const BAND_LABEL = { strong: "Strong fit", good: "Good fit", stretch: "Stretch", weak: "Weak fit" } as const;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -87,6 +90,34 @@ export default async function InsightsPage() {
               </div>
             )}
             {untagged > 0 && <p className="mt-5 text-xs text-muted">{untagged} applied {untagged === 1 ? "job has" : "jobs have"} no channel recorded.</p>}
+          </section>
+          <section className="rounded-3xl bg-white p-6 lg:col-span-2">
+            <h2 className="font-semibold">Does the fit score predict results?</h2>
+            <p className="mt-1 text-sm text-muted">Applications by fit score, and how many reached a screen or an interview. This only reports; it never changes how jobs are scored.</p>
+            {!cal.enough ? (
+              <p className="mt-5 text-sm text-muted">
+                Too early to tell: {cal.scored} scored {cal.scored === 1 ? "application" : "applications"} so far. Check back after {MIN_APPLIED}.
+              </p>
+            ) : (
+              <>
+                <div className="mt-5 grid gap-3 sm:grid-cols-4">
+                  {cal.bands.map((b) => (
+                    <div key={b.verdict} className="rounded-2xl bg-card p-4">
+                      <p className="text-sm font-medium">{BAND_LABEL[b.verdict]}</p>
+                      <p className="text-xs text-muted">Score {b.min}+ · {b.applied} applied</p>
+                      <p className="mt-3 text-2xl font-semibold">{b.applied ? `${pct(b.responded, b.applied)}%` : "–"}</p>
+                      <p className="text-xs text-muted">responses · {b.applied ? `${pct(b.interviewed, b.applied)}%` : "–"} interviews</p>
+                    </div>
+                  ))}
+                </div>
+                {cal.inverted && (
+                  <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    {BAND_LABEL[cal.inverted.better]} applications are getting more responses than {BAND_LABEL[cal.inverted.worse].toLowerCase()} ones. Your target roles or preferences may not match the jobs that are working for you; it&apos;s worth reviewing them in Settings.
+                  </p>
+                )}
+              </>
+            )}
+            {cal.unscored > 0 && <p className="mt-4 text-xs text-muted">{cal.unscored} applied {cal.unscored === 1 ? "job has" : "jobs have"} no fit score and {cal.unscored === 1 ? "isn't" : "aren't"} counted.</p>}
           </section>
         </div>
       )}

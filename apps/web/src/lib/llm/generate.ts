@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { Credential } from "./credentials";
 import { UserFacingError } from "./errors";
 import { modelFor, type Tier } from "./models";
+import { releaseStarterRuns } from "./quota";
 
 type Request<T extends z.ZodType> = {
   credential: Credential;
@@ -99,11 +100,14 @@ async function viaGemini<T extends z.ZodType>(r: Request<T>, model: string): Pro
 // Single entry point every agent uses: routes to the user's provider and returns schema-valid data.
 export async function generateStructured<T extends z.ZodType>(r: Request<T>): Promise<Generated<z.infer<T>>> {
   const model = modelFor(r.credential.provider, r.tier);
+  // Each call uses one claimed Starter run; a failed call gives it back.
+  const claim = r.credential.starterClaims?.shift();
   try {
     if (r.credential.provider === "anthropic") return await viaAnthropic(r, model);
     if (r.credential.provider === "openai") return await viaOpenAI(r, model);
     return await viaGemini(r, model);
   } catch (err) {
+    if (claim) await releaseStarterRuns([claim]);
     if (err instanceof UserFacingError) throw err;
     const status = (err as { status?: number }).status;
     if (r.credential.source === "starter" && (status === 401 || status === 403 || status === 429)) {

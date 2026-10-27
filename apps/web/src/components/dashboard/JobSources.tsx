@@ -3,13 +3,14 @@
 import { AlertTriangle, Building2, Check, Copy, ExternalLink, Loader2, Mail, RefreshCw, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { addJobSource, checkSourcesNow, removeJobSource, setSourceMatching } from "@/app/dashboard/jobs/discovery-actions";
+import { addJobSource, checkSourcesNow, removeJobSource, saveTitleExclusions, setSourceMatching } from "@/app/dashboard/jobs/discovery-actions";
+import { SOURCE_LABEL, type SourceKind } from "@/lib/source-kinds";
 import { inputClass } from "@/components/onboarding/fields";
 import { Button } from "./ui";
 
 export type JobSource = {
   id: string;
-  kind: "greenhouse" | "lever" | "ashby";
+  kind: SourceKind;
   board_token: string;
   company_name: string;
   only_matching: boolean;
@@ -27,7 +28,6 @@ export type InboundEmailRow = {
   received_at: string;
 };
 
-const KIND_LABEL = { greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby" };
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 function AlertAddress({ address, emails }: { address: string; emails: InboundEmailRow[] }) {
@@ -125,7 +125,7 @@ function CareerBoards({ sources }: { sources: JobSource[] }) {
           <p className="flex items-center gap-2 font-medium">
             <Building2 className="size-4 text-wing" /> Company careers pages
           </p>
-          <p className="mt-1 text-sm text-muted">Follow companies that hire through Greenhouse, Lever or Ashby. We check every few hours and add roles matching your targets, with full descriptions.</p>
+          <p className="mt-1 text-sm text-muted">Follow companies that hire through Greenhouse, Lever, Ashby, SmartRecruiters, Workable or Recruitee. We check every few hours and add roles matching your targets, with full descriptions.</p>
         </div>
         {sources.length > 0 && (
           <Button variant="ghost" className="px-3 py-2 text-xs" disabled={pending} onClick={() => run(checkSourcesNow, (r) => `Checked ${r.checked} ${r.checked === 1 ? "page" : "pages"}: ${r.added} new ${r.added === 1 ? "job" : "jobs"}.`)}>
@@ -147,7 +147,7 @@ function CareerBoards({ sources }: { sources: JobSource[] }) {
           );
         }}
       >
-        <input className={inputClass} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="boards.greenhouse.io/stripe · jobs.lever.co/company · jobs.ashbyhq.com/company" aria-label="Careers page link" />
+        <input className={inputClass} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="boards.greenhouse.io/stripe · jobs.lever.co/company · apply.workable.com/company" aria-label="Careers page link" />
         <Button disabled={pending || !url.trim()}>{pending ? <Loader2 className="size-4 animate-spin" /> : null} Follow</Button>
       </form>
       {message && <p className={`mt-3 rounded-lg px-3 py-2 text-sm ${message.tone === "error" ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}>{message.text}</p>}
@@ -158,7 +158,7 @@ function CareerBoards({ sources }: { sources: JobSource[] }) {
             <li key={s.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1">
                 <p className="font-medium">
-                  {s.company_name} <span className="text-xs font-normal text-muted">· {KIND_LABEL[s.kind]}</span>
+                  {s.company_name} <span className="text-xs font-normal text-muted">· {SOURCE_LABEL[s.kind]}</span>
                 </p>
                 <p className="text-xs text-muted">
                   {s.last_error ? (
@@ -187,11 +187,44 @@ function CareerBoards({ sources }: { sources: JobSource[] }) {
   );
 }
 
-export function JobSources({ alertAddress, sources, emails }: { alertAddress: string; sources: JobSource[]; emails: InboundEmailRow[] }) {
+function TitleExclusions({ initial }: { initial: string[] }) {
+  const [text, setText] = useState(initial.join(", "));
+  const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string }>();
+  const [pending, start] = useTransition();
+  const save = () =>
+    start(async () => {
+      const r = await saveTitleExclusions(text.split(/[,\n]/));
+      if (r.error) return setMessage({ tone: "error", text: r.error });
+      setText((r.saved ?? []).join(", "));
+      setMessage({ tone: "ok", text: r.saved?.length ? "Saved. Titles with these words won't reach your inbox." : "Saved. No titles are skipped." });
+    });
+  return (
+    <div className="rounded-2xl border border-line p-5">
+      <p className="font-medium">Skip titles containing</p>
+      <p className="mt-1 text-sm text-muted">
+        Whole words, separated by commas. Applies to alerts and careers pages, e.g. &quot;intern, contract, interior&quot; keeps &quot;Interior Designer&quot; out when you target Product Designer roles.
+      </p>
+      <form
+        className="mt-4 flex flex-col gap-2 sm:flex-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+      >
+        <input className={inputClass} value={text} onChange={(e) => setText(e.target.value)} placeholder="intern, contract, interior" aria-label="Words to skip in job titles" />
+        <Button disabled={pending}>{pending ? <Loader2 className="size-4 animate-spin" /> : null} Save</Button>
+      </form>
+      {message && <p className={`mt-3 rounded-lg px-3 py-2 text-sm ${message.tone === "error" ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}>{message.text}</p>}
+    </div>
+  );
+}
+
+export function JobSources({ alertAddress, sources, emails, titleExclude }: { alertAddress: string; sources: JobSource[]; emails: InboundEmailRow[]; titleExclude: string[] }) {
   return (
     <div className="space-y-4">
       <AlertAddress address={alertAddress} emails={emails} />
       <CareerBoards sources={sources} />
+      <TitleExclusions initial={titleExclude} />
     </div>
   );
 }

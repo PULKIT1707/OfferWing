@@ -2,14 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import type { JobMatch } from "@/lib/agents/job-match";
-import { buildOutreachPrompt, FOLLOW_UP_AFTER_DAYS, MAX_FOLLOW_UPS, OUTREACH_SYSTEM, outreachDraftSchema, STARTER_DAILY_DRAFTS, type OutreachDraft, type OutreachKind } from "@/lib/agents/outreach";
+import { buildOutreachPrompt, FOLLOW_UP_AFTER_DAYS, MAX_FOLLOW_UPS, OUTREACH_SYSTEM, outreachDraftSchema, type OutreachDraft, type OutreachKind } from "@/lib/agents/outreach";
 import { CONNECTION_COLUMNS, scoreConnection, type Connection } from "@/lib/agents/referral-scout";
 import { requireUser } from "@/lib/auth";
 import { CONTACT_COLUMNS, daysSince, labelOf, RELATIONSHIPS, type Contact } from "@/lib/dashboard";
-import { resolveCredential } from "@/lib/llm/credentials";
 import { UserFacingError } from "@/lib/llm/errors";
 import { generateStructured } from "@/lib/llm/generate";
-import { starterRunsLeft } from "@/lib/llm/quota";
+import { credentialForAgent } from "@/lib/llm/agent-credential";
 import { withDefaults } from "@/lib/onboarding";
 import { dateInZone } from "@/lib/time";
 import { userTimeZone } from "@/lib/user-time";
@@ -32,17 +31,8 @@ export async function draftOutreach(contactId: string, kind: OutreachKind, jobId
   ]);
   if (kind === "follow_up" && contact.follow_ups_sent >= MAX_FOLLOW_UPS) return { error: `You've already followed up ${MAX_FOLLOW_UPS} times. Better to let this one rest.` };
 
-  let credential;
-  try {
-    credential = await resolveCredential(supabase, userId);
-  } catch (err) {
-    if (err instanceof UserFacingError) return { error: err.message };
-    throw err;
-  }
-  if (credential.source === "starter" && !(await starterRunsLeft(supabase, "outreach_drafts", STARTER_DAILY_DRAFTS))) {
-    return { error: `Starter includes ${STARTER_DAILY_DRAFTS} drafts a day. Add your own AI key in Settings for unlimited drafts.` };
-  }
-
+  const credential = await credentialForAgent(supabase, userId, "outreach_draft");
+  if ("error" in credential) return credential;
   const prefs = withDefaults(search);
   const signals = connection ? scoreConnection(connection as Connection, await loadScoringContext(supabase, userId)).reasons : [];
   const { data: match } = job

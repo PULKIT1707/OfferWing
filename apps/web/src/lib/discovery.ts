@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sameCompany } from "@/lib/dashboard";
 import { alertAliasFrom, classifyInbound, parseForwardingConfirmation, parseLinkedInAlert } from "@/lib/job-alerts";
-import { fetchBoard, matchesTargetRoles, nameFromToken, type Board, type SourceKind } from "@/lib/job-sources";
+import { fetchBoard, matchesTargetRoles, nameFromToken, normalizeJobUrl, titleExcluded, withDetails, type Board, type Posting, type SourceKind } from "@/lib/job-sources";
 
 export type DiscoveredJob = {
   externalId: string;
@@ -16,20 +16,32 @@ export type DiscoveredJob = {
 
 export const ALERT_DOMAIN = () => process.env.ALERT_EMAIL_DOMAIN ?? "alerts.offerwing.app";
 
-// Adds new jobs to the user's inbox ("discovered"), skipping ones already known (by source ID or URL)
-// and companies on their avoid list. Returns how many were added.
-export async function insertDiscoveredJobs(db: SupabaseClient, userId: string, items: DiscoveredJob[], excludedCompanies: string[]): Promise<number> {
-  const candidates = items.filter((j) => j.title.trim() && !excludedCompanies.some((c) => sameCompany(c, j.company)));
+// Adds new jobs to the user's inbox ("discovered"), skipping ones already known (by source ID or by
+// URL, compared without tracking parameters), companies on their avoid list and titles with their
+// excluded words. `enrich` fills in missing descriptions for the new ones only. Returns how many were added.
+export async function insertDiscoveredJobs(
+  db: SupabaseClient,
+  userId: string,
+  items: DiscoveredJob[],
+  excludedCompanies: string[],
+  options: { titleExclude?: string[]; enrich?: (jobs: DiscoveredJob[]) => Promise<DiscoveredJob[]> } = {},
+): Promise<number> {
+  const candidates = items
+    .filter((j) => j.title.trim() && !excludedCompanies.some((c) => sameCompany(c, j.company)) && !titleExcluded(j.title, options.titleExclude ?? []))
+    .map((j) => ({ ...j, url: normalizeJobUrl(j.url) }));
   if (!candidates.length) return 0;
-
+  const rawUrls = items.map((i) => i.url);
   const [byId, byUrl] = await Promise.all([
     db.from("jobs").select("external_id").eq("user_id", userId).in("external_id", candidates.map((c) => c.externalId)),
-    db.from("jobs").select("url").eq("user_id", userId).in("url", candidates.map((c) => c.url)),
+    db.from("jobs").select("url").eq("user_id", userId).in("url", [...new Set([...candidates.map((c) => c.url), ...rawUrls])]),
   ]);
   const knownIds = new Set((byId.data ?? []).map((r) => r.external_id));
-  const knownUrls = new Set((byUrl.data ?? []).map((r) => r.url));
-  const fresh = candidates.filter((c, i) => !knownIds.has(c.externalId) && !knownUrls.has(c.url) && candidates.findIndex((d) => d.externalId === c.externalId) === i);
-  if (!fresh.length) return 0;
+  const knownUrls = new Set((byUrl.data ?? []).map((r) => normalizeJobUrl(r.url)));
+  const unique = candidates.filter(
+    (c, i) => !knownIds.has(c.externalId) && !knownUrls.has(c.url) && candidates.findIndex((d) => d.externalId === c.externalId || d.url === c.url) === i,
+  );
+  if (!unique.length) return 0;
+  const fresh = options.enrich ? await options.enrich(unique) : unique;
 
   const { error } = await db.from("jobs").insert(
     fresh.map((j) => ({
@@ -49,7 +61,8 @@ export async function insertDiscoveredJobs(db: SupabaseClient, userId: string, i
 }
 
 type SourceRow = { id: string; user_id: string; kind: SourceKind; board_token: string; company_name: string; only_matching: boolean };
-type Prefs = { target_roles: string[]; excluded_companies: string[] };
+type Prefs = { target_roles: string[]; excluded_companies: string[]; title_exclude: string[] };
+const NO_PREFS: Prefs = { target_roles: [], excluded_companies: [], title_exclude: [] };
 
 // Polls career boards, fetching each board once even when several users follow it.
 export async function pollSources(db: SupabaseClient, sources: SourceRow[], prefsByUser: Map<string, Prefs>): Promise<{ checked: number; added: number }> {
@@ -58,15 +71,23 @@ export async function pollSources(db: SupabaseClient, sources: SourceRow[], pref
   for (const s of sources) {
     const key = `${s.kind}:${s.board_token.toLowerCase()}`;
     if (!boards.has(key)) boards.set(key, fetchBoard(s.kind, s.board_token));
-    const prefs = prefsByUser.get(s.user_id) ?? { target_roles: [], excluded_companies: [] };
+    const prefs = prefsByUser.get(s.user_id) ?? NO_PREFS;
     try {
       const board = await boards.get(key)!;
-      const postings = s.only_matching ? board.postings.filter((p) => matchesTargetRoles(p.title, prefs.target_roles)) : board.postings;
+      const postings = s.only_matching ? board.postings.filter((p) => matchesTargetRoles(p.title, prefs.target_roles, prefs.title_exclude)) : board.postings;
       const count = await insertDiscoveredJobs(
         db,
         s.user_id,
         postings.map((p) => ({ ...p, company: s.company_name, source: "ats" as const })),
         prefs.excluded_companies,
+        {
+          titleExclude: prefs.title_exclude,
+          // Boards whose listing has no description (SmartRecruiters) are read per new posting.
+          enrich: async (jobs) => {
+            const withText = await withDetails(s.kind, s.board_token, jobs as (DiscoveredJob & Posting)[]);
+            return withText.map((p, i) => ({ ...jobs[i], description: p.description }));
+          },
+        },
       );
       added += count;
       await db.from("job_sources").update({ last_checked_at: new Date().toISOString(), last_found: count, last_error: null }).eq("id", s.id);
@@ -78,8 +99,10 @@ export async function pollSources(db: SupabaseClient, sources: SourceRow[], pref
 }
 
 export async function loadPrefs(db: SupabaseClient, userIds: string[]): Promise<Map<string, Prefs>> {
-  const { data } = await db.from("search_profiles").select("user_id, target_roles, excluded_companies").in("user_id", userIds);
-  return new Map((data ?? []).map((p) => [p.user_id, { target_roles: p.target_roles ?? [], excluded_companies: p.excluded_companies ?? [] }]));
+  const { data } = await db.from("search_profiles").select("user_id, target_roles, excluded_companies, title_exclude").in("user_id", userIds);
+  return new Map(
+    (data ?? []).map((p) => [p.user_id, { target_roles: p.target_roles ?? [], excluded_companies: p.excluded_companies ?? [], title_exclude: p.title_exclude ?? [] }]),
+  );
 }
 
 export { nameFromToken };
@@ -106,6 +129,7 @@ export async function ingestInboundEmail(admin: SupabaseClient, email: InboundEm
       profile.id,
       jobs.map((j) => ({ ...j, description: null, source: "alert" as const })),
       prefs?.excluded_companies ?? [],
+      { titleExclude: prefs?.title_exclude },
     );
     detail = { parsed: jobs.length };
   } else if (kind === "forwarding_confirmation") {

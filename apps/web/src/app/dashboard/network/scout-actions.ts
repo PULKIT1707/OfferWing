@@ -11,7 +11,6 @@ import {
   referralDraftSchema,
   roleTermsFrom,
   scoreConnection,
-  STARTER_DAILY_DRAFTS,
   type Connection,
   type ReferralDraft,
 } from "@/lib/agents/referral-scout";
@@ -19,7 +18,7 @@ import type { JobMatch } from "@/lib/agents/job-match";
 import { requireUser } from "@/lib/auth";
 import { sameCompany } from "@/lib/dashboard";
 import { parseLinkedInExport } from "@/lib/linkedin-export";
-import { resolveCredential } from "@/lib/llm/credentials";
+import { credentialForAgent } from "@/lib/llm/agent-credential";
 import { UserFacingError } from "@/lib/llm/errors";
 import { generateStructured } from "@/lib/llm/generate";
 import { withDefaults } from "@/lib/onboarding";
@@ -137,20 +136,8 @@ export async function draftReferralAsk(connectionId: string, jobId: string | nul
   const connection = conn as Connection;
   if (job && !sameCompany(job.company, connection.company)) return { error: `${connection.full_name} doesn't work at ${job.company}.` };
 
-  let credential;
-  try {
-    credential = await resolveCredential(supabase, userId);
-  } catch (err) {
-    if (err instanceof UserFacingError) return { error: err.message };
-    throw err;
-  }
-  if (credential.source === "starter") {
-    const since = new Date();
-    since.setHours(0, 0, 0, 0);
-    const { count } = await supabase.from("outreach_drafts").select("id", { count: "exact", head: true }).eq("credential", "starter").gte("created_at", since.toISOString());
-    if ((count ?? 0) >= STARTER_DAILY_DRAFTS) return { error: `Starter includes ${STARTER_DAILY_DRAFTS} drafts a day. Add your own AI key in Settings for unlimited drafts.` };
-  }
-
+  const credential = await credentialForAgent(supabase, userId, "outreach_draft");
+  if ("error" in credential) return credential;
   const prefs = withDefaults(search);
   const { data: match } = job
     ? await supabase.from("job_matches").select("result").eq("job_id", job.id).eq("status", "complete").order("created_at", { ascending: false }).limit(1).maybeSingle()

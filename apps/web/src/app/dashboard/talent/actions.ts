@@ -6,6 +6,7 @@ import { z } from "zod";
 import { buildTalentPrompt, isTalentGenerating, TALENT_PROFILE_SYSTEM, talentProfileSchema } from "@/lib/agents/talent-profile";
 import { sourceChecker, verifyClaims } from "@/lib/agents/truthfulness";
 import { requireUser } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { loadCareerText } from "@/lib/documents";
 import { credentialForAgent } from "@/lib/llm/agent-credential";
 import { UserFacingError } from "@/lib/llm/errors";
@@ -17,8 +18,14 @@ import { AVAILABILITY, findIdentifying, identityTerms, scrubIdentity } from "@/l
 
 type Result = { error?: string };
 
+// Users can read and delete their talent profile but not write it (migration 0020): every write
+// goes through these actions, after the checks that make the profile anonymous and fact-checked.
+const NOT_CONFIGURED = "The talent marketplace isn't available right now.";
+
 export async function buildTalentProfile(): Promise<Result> {
   const { supabase, userId } = await requireUser();
+  const admin = createAdminClient();
+  if (!admin) return { error: NOT_CONFIGURED };
   const [{ data: existing }, { data: search }, { data: profile }, { data: application }, { data: lastImport }] = await Promise.all([
     supabase.from("talent_profiles").select("status, updated_at, hidden_companies").eq("user_id", userId).maybeSingle(),
     supabase.from("search_profiles").select("*").eq("user_id", userId).maybeSingle(),
@@ -58,14 +65,12 @@ export async function buildTalentProfile(): Promise<Result> {
     hidden_companies: hidden,
     updated_at: now,
   };
-  // Users may update only some columns (not user_id), so this can't be a single upsert.
-  const { error } = existing
-    ? await supabase.from("talent_profiles").update(fields).eq("user_id", userId)
-    : await supabase.from("talent_profiles").insert({ user_id: userId, ...fields });
+  const { error } = await admin.from("talent_profiles").upsert({ user_id: userId, ...fields });
   if (error) return { error: "Couldn't start. Please try again." };
 
   after(async () => {
-    const { supabase: db } = await requireUser();
+    const { supabase: userDb } = await requireUser();
+    const db = admin;
     try {
       const result = await generateStructured({
         credential,
@@ -76,7 +81,7 @@ export async function buildTalentProfile(): Promise<Result> {
         schema: talentProfileSchema,
         schemaName: "talent_profile",
       });
-      await recordAgentRun(db, userId, "talent_profile", credential, result.model);
+      await recordAgentRun(userDb, userId, "talent_profile", credential, result.model);
       const d = result.data;
       const { skillFound, source } = sourceChecker(sourceText);
 
@@ -140,8 +145,10 @@ export async function saveTalentProfile(edit: TalentEdit): Promise<Result> {
   const d = parsed.data;
   const contact = findIdentifying([d.headline, d.summary, ...d.highlights.map((h) => h.text)].join("\n"), []);
   if (contact.length) return { error: `Your profile is anonymous: remove ${contact.join(" and ")}. Recruiters get your contact details only when you accept an intro.` };
-  const { supabase, userId } = await requireUser();
-  const { error } = await supabase
+  const { userId } = await requireUser();
+  const admin = createAdminClient();
+  if (!admin) return { error: NOT_CONFIGURED };
+  const { error } = await admin
     .from("talent_profiles")
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
     .eq("user_id", userId)
@@ -155,7 +162,9 @@ export async function setTalentVisibility(visible: boolean): Promise<Result> {
   const { supabase, userId } = await requireUser();
   const { data: t } = await supabase.from("talent_profiles").select("status, headline, published_at").eq("user_id", userId).maybeSingle();
   if (visible && (t?.status !== "draft" || !t.headline)) return { error: "Build your profile first." };
-  const { error } = await supabase
+  const admin = createAdminClient();
+  if (!admin) return { error: NOT_CONFIGURED };
+  const { error } = await admin
     .from("talent_profiles")
     .update({ visible, ...(visible && !t?.published_at ? { published_at: new Date().toISOString() } : {}) })
     .eq("user_id", userId);

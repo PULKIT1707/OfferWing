@@ -81,7 +81,8 @@ OfferWing/
 │       ├── 0012_weekly_plans.sql  weekly_plans
 │       ├── 0013–0017              autofill, referral packets, organizations, talent marketplace, onboarding prefill
 │       ├── 0018_starter_usage_ledger.sql  starter_limits, starter_usage, claim_starter_runs()
-│       └── 0019_more_job_sources.sql      SmartRecruiters / Workable / Recruitee boards, search_profiles.title_exclude
+│       ├── 0019_more_job_sources.sql      SmartRecruiters / Workable / Recruitee boards, search_profiles.title_exclude
+│       └── 0020_talent_profile_writes.sql users read and delete their talent profile; only the server writes it
 ├── .github/workflows/ci.yml       Lint, type check, tests and extension build
 └── apps/
     ├── extension/                 Chrome MV3 side panel (esbuild + React); see apps/extension/README.md
@@ -128,7 +129,7 @@ npm install
 ### 2. Set up Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Apply the migrations **in order** (`0001` → `0019`). Either:
+2. Apply the migrations **in order** (`0001` → `0020`). Either:
    - paste each file from `supabase/migrations/` into **SQL Editor** and run it, or
    - with the Supabase CLI: `supabase link --project-ref <ref>` then `supabase db push` from the repo root.
 3. Check that the **Vault** extension is enabled (Database → Extensions → `supabase_vault`). It is on by default in new projects and is needed for Always-on keys.
@@ -161,7 +162,7 @@ Set these in `apps/web/.env.local`. It's gitignored; never commit it.
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Project URL (Project Settings → API). |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Publishable (anon) key. Safe in the browser because RLS protects the data. |
-| `SUPABASE_SERVICE_ROLE_KEY` | For Always-on mode, inbound email and cron | **Server-only** secret key. Used to decrypt a user's Vault-stored key during an agent run (`get_user_ai_key()`), to file forwarded alert emails (no user session exists for inbound mail) and by the scheduled jobs. |
+| `SUPABASE_SERVICE_ROLE_KEY` | For Always-on mode, inbound email, cron and the talent marketplace | **Server-only** secret key. Used to decrypt a user's Vault-stored key during an agent run (`get_user_ai_key()`), to file forwarded alert emails (no user session exists for inbound mail), by the scheduled jobs, and to write talent profiles after they're redacted and fact-checked (users can't write them directly). |
 | `OFFERWING_STARTER_OPENAI_API_KEY` or `OFFERWING_STARTER_ANTHROPIC_API_KEY` | For Starter mode | Offerwing's own key that powers free Starter usage, within the daily limits below. The OpenAI variable wins if both are set; the provider is detected from the key prefix (`sk-ant-` Anthropic, `sk-` OpenAI, `AIza` Gemini). Production currently runs Starter on OpenAI. |
 | `NEXT_PUBLIC_EXTENSION_ID` | For the extension | The only extension ID `/extension/connect` will hand a session to. The dev build's ID is fixed by the manifest `key`: `mgoonaiikahlemfjhcdgpdgjmkjjbmbc`. |
 | `INBOUND_EMAIL_SECRET` | For alert forwarding | Shared secret your inbound-email provider sends as `?secret=` when it POSTs to `/api/inbound/email`. |
@@ -212,7 +213,7 @@ Defaults live in [`lib/llm/models.ts`](apps/web/src/lib/llm/models.ts). Override
 
 ## Data model and security
 
-All user tables have `user_id` and **row-level security** limiting access to `auth.uid()`. The app uses the publishable key plus the user's session everywhere; the service-role key is used for exactly one RPC.
+All user tables have `user_id` and **row-level security** limiting access to `auth.uid()`. The app uses the publishable key plus the user's session everywhere; the service-role key is used only for the cases listed under `SUPABASE_SERVICE_ROLE_KEY` above.
 
 | Table | Purpose |
 |---|---|

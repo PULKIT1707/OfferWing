@@ -28,17 +28,32 @@ const clip = (s: string | null | undefined) => (s ? s.slice(0, 30000) : null);
 const htmlText = (html: string | null | undefined) => (html ? stripTags(decodeEntities(html)) : "");
 const MAX_BODY_BYTES = 15 * 1024 * 1024;
 
+const UNREACHABLE = "Couldn't reach the careers board just now. Try again in a minute.";
+
+// One retry for failures that are usually momentary: network errors, timeouts, 429 and 5xx.
+async function fetchWithRetry(u: URL): Promise<Response> {
+  const once = () =>
+    fetch(u, {
+      headers: { Accept: "application/json", "User-Agent": "Offerwing job discovery" },
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    });
+  const first = await once().catch(() => null);
+  if (first && first.status !== 429 && first.status < 500) return first;
+  await new Promise((r) => setTimeout(r, 1000));
+  return once().catch(() => {
+    throw new Error(UNREACHABLE);
+  });
+}
+
 // Every request goes through here: HTTPS only, the host must be one the provider declared, no
 // redirects (a redirect could point anywhere), a timeout and a size cap.
 async function getJson(url: string, allowedHost: (host: string) => boolean): Promise<unknown> {
   const u = new URL(url);
   if (u.protocol !== "https:" || !allowedHost(u.hostname.toLowerCase())) throw new Error("That careers board address isn't allowed.");
-  const res = await fetch(u, {
-    headers: { Accept: "application/json", "User-Agent": "Offerwing job discovery" },
-    redirect: "error",
-    signal: AbortSignal.timeout(15_000),
-  });
+  const res = await fetchWithRetry(u);
   if (res.status === 404) throw new Error("That careers board wasn't found. Check the link.");
+  if (res.status === 429 || res.status >= 500) throw new Error(UNREACHABLE);
   if (!res.ok) throw new Error(`The careers board responded with an error (${res.status}).`);
   if (Number(res.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) throw new Error("That careers board is too large to read.");
   const text = await res.text();

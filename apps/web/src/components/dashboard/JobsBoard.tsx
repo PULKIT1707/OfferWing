@@ -138,15 +138,19 @@ export function JobsBoard({ initialJobs, contacts }: { initialJobs: Job[]; conta
   const inbox = jobs.filter((j) => j.stage === "discovered");
   const closed = jobs.filter((j) => !OPEN_STAGES.includes(j.stage) && j.stage !== "discovered");
 
+  // Scores one just-saved job, saying why when it can't be (no key, avoided company, closed posting…).
+  function scoreSaved(jobId: string, verb: "Added" | "Saved") {
+    void startJobMatches([jobId]).then(async (r) => {
+      const reason = r.error ?? r.skipped[0]?.reason;
+      if (reason) setError(`${verb}, but couldn't score it: ${reason}`);
+      else if (r.queued) setScoring((await getScoringStatus()).running);
+    });
+  }
+
   // Saving from the inbox moves the job into the pipeline and scores it when it has a description.
   function saveFromInbox(j: Job) {
     move(j.id, "saved");
-    if (j.description) {
-      void startJobMatches([j.id]).then(async (r) => {
-        if (r.error) setError(`Saved, but couldn't score it: ${r.error}`);
-        else if (r.queued) setScoring((await getScoringStatus()).running);
-      });
-    }
+    if (j.description) scoreSaved(j.id, "Saved");
   }
   return (
     <div>
@@ -256,12 +260,7 @@ export function JobsBoard({ initialJobs, contacts }: { initialJobs: Job[]; conta
               upsert(j);
               setEditing(null);
               // New jobs with a description get scored automatically.
-              if (isNew && j.description) {
-                void startJobMatches([j.id]).then(async (r) => {
-                  if (r.error) setError(`Added, but couldn't score it: ${r.error}`);
-                  else if (r.queued) setScoring((await getScoringStatus()).running);
-                });
-              }
+              if (isNew && j.description) scoreSaved(j.id, "Added");
             }}
             onDeleted={(id) => {
               setJobs((all) => all.filter((x) => x.id !== id));

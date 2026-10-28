@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { activeSponsor } from "@/lib/orgs";
-import { ACTIVE_STAGES, CONTACT_COLUMNS, JOB_COLUMNS, sameCompany, type Contact, type Job } from "@/lib/dashboard";
+import { ACTIVE_STAGES, CONTACT_COLUMNS, companyKey, JOB_COLUMNS, sameCompany, type Contact, type Job } from "@/lib/dashboard";
 import { userDate, userTimeZone } from "@/lib/user-time";
 import { weekStartInZone } from "@/lib/time";
 import type { WeeklyPlan } from "@/lib/agents/coach";
@@ -76,7 +76,12 @@ export default async function TodayPage() {
     .map((j) => ({ job: j, person: contacts.filter((c) => sameCompany(c.company, j.company) && ["none", "to_ask"].includes(c.referral_status)).sort((a, b) => b.strength - a.strength)[0] }))
     .filter((x) => x.person)
     .slice(0, 4);
-  const noOneThere = open.filter((j) => j.stage === "saved" && !contacts.some((c) => sameCompany(c.company, j.company))).slice(0, 3);
+  // Saved jobs with no one on the referral list: imported LinkedIn connections may still work there.
+  const notOnList = open.filter((j) => j.stage === "saved" && !contacts.some((c) => sameCompany(c.company, j.company))).slice(0, 3);
+  const keys = [...new Set(notOnList.map((j) => companyKey(j.company)).filter((k): k is string => !!k))];
+  const { data: known } = keys.length ? await supabase.from("connections").select("company_key").in("company_key", keys) : { data: [] };
+  const connectionsAt = (company: string) => (known ?? []).filter((c) => c.company_key === companyKey(company)).length;
+  const noOneThere = notOnList.map((job) => ({ job, connections: connectionsAt(job.company) }));
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -164,11 +169,19 @@ export default async function TodayPage() {
                     </Link>
                   </li>
                 ))}
-                {noOneThere.map((job) => (
+                {noOneThere.map(({ job, connections }) => (
                   <li key={job.id} className="flex items-center gap-3 rounded-2xl border border-dashed border-line p-4">
                     <Users className="size-5 shrink-0 text-muted" />
                     <p className="flex-1 text-sm text-muted">
-                      You don&apos;t know anyone at <span className="font-medium text-foreground">{job.company}</span> yet. Look for alumni or ex-colleagues there.
+                      {connections > 0 ? (
+                        <>
+                          You have {connections} LinkedIn {connections === 1 ? "connection" : "connections"} at <span className="font-medium text-foreground">{job.company}</span>. See who to ask for a referral.
+                        </>
+                      ) : (
+                        <>
+                          You don&apos;t know anyone at <span className="font-medium text-foreground">{job.company}</span> yet. Look for alumni or ex-colleagues there.
+                        </>
+                      )}
                     </p>
                     <Link href="/dashboard/network" className="text-wing" aria-label="Open network">
                       <ArrowRight className="size-4" />

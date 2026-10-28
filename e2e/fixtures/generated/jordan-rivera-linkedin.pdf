@@ -1,0 +1,67 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 971 >>
+stream
+BT /F1 10 Tf 14 TL 50 750 Td
+(Contact) Tj T*
+(linkedin.com/in/jordan-rivera-owtest \(LinkedIn\)) Tj T*
+(Top Skills) Tj T*
+(Go) Tj T*
+(Python) Tj T*
+(PostgreSQL) Tj T*
+(Certifications) Tj T*
+(AWS Certified Solutions Architect - Associate \(2022\)) Tj T*
+() Tj T*
+(Jordan Rivera) Tj T*
+(Backend engineer | Payments and ledgers | Go, Python, PostgreSQL) Tj T*
+(San Francisco, CA) Tj T*
+(Summary) Tj T*
+(I build payment and data platforms. Most recently I led a ledger migration to event sourcing at) Tj T*
+(Ledgerly.) Tj T*
+(Experience) Tj T*
+(Ledgerly) Tj T*
+(Senior Software Engineer) Tj T*
+(Mar 2021 - Present) Tj T*
+(San Francisco, CA) Tj T*
+() Tj T*
+(Brightpath Analytics) Tj T*
+(Software Engineer) Tj T*
+(Jun 2018 - Feb 2021) Tj T*
+(Austin, TX) Tj T*
+() Tj T*
+(Cobalt Labs) Tj T*
+(Junior Developer) Tj T*
+(Jul 2016 - May 2018) Tj T*
+(Austin, TX) Tj T*
+() Tj T*
+(Education) Tj T*
+(University of Texas at Austin) Tj T*
+(B.S. Computer Science · \(2012 - 2016\)) Tj T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000185 00000 n 
+0000001207 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1333
+%%EOF

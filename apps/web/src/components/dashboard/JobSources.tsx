@@ -128,7 +128,7 @@ function CareerBoards({ sources }: { sources: JobSource[] }) {
           <p className="mt-1 text-sm text-muted">Follow companies that hire through Greenhouse, Lever, Ashby, SmartRecruiters, Workable or Recruitee. We check every few hours and add roles matching your targets, with full descriptions.</p>
         </div>
         {sources.length > 0 && (
-          <Button variant="ghost" className="px-3 py-2 text-xs" disabled={pending} onClick={() => run(checkSourcesNow, (r) => `Checked ${r.checked} ${r.checked === 1 ? "page" : "pages"}: ${r.added} new ${r.added === 1 ? "job" : "jobs"}.`)}>
+          <Button variant="ghost" className="px-3 py-2 text-xs" disabled={pending} onClick={() => run(checkSourcesNow, (r) => `Checked ${r.checked} ${r.checked === 1 ? "page" : "pages"}: ${r.added} new ${r.added === 1 ? "job" : "jobs"}.${r.failed ? ` ${r.failed} couldn't be read; see below.` : ""}`)}>
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />} Check now
           </Button>
         )}

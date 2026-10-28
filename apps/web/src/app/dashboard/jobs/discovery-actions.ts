@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { loadPrefs, pollSources } from "@/lib/discovery";
-import { fetchBoard, nameFromToken, parseCareersUrl } from "@/lib/job-sources";
+import { fetchBoard, nameFromToken, parseCareersUrl, type Board } from "@/lib/job-sources";
 import { MAX_TITLE_EXCLUDE } from "@/lib/source-kinds";
 
 const SOURCE_COLUMNS = "id, user_id, kind, board_token, company_name, only_matching";
@@ -21,13 +21,13 @@ export async function addJobSource(input: string): Promise<{ error?: string; add
   const { count } = await supabase.from("job_sources").select("id", { count: "exact", head: true });
   if ((count ?? 0) >= MAX_SOURCES) return { error: `You can follow up to ${MAX_SOURCES} career boards.` };
 
-  let companyName: string;
+  let board: Board;
   try {
-    const board = await fetchBoard(parsed.kind, parsed.token);
-    companyName = board.companyName ?? nameFromToken(parsed.token);
+    board = await fetchBoard(parsed.kind, parsed.token);
   } catch (err) {
     return { error: (err as Error).message };
   }
+  const companyName = board.companyName ?? nameFromToken(parsed.token);
 
   const { data: source, error } = await supabase
     .from("job_sources")
@@ -37,8 +37,10 @@ export async function addJobSource(input: string): Promise<{ error?: string; add
   if (error?.code === "23505") return { error: `You already follow ${companyName}'s careers page.` };
   if (error || !source) return { error: "Couldn't save that careers page. Please try again." };
 
-  const { added } = await pollSources(supabase, [source], await loadPrefs(supabase, [userId]));
+  const { added, failed } = await pollSources(supabase, [source], await loadPrefs(supabase, [userId]), { kind: parsed.kind, token: parsed.token, board });
   revalidatePath("/dashboard", "layout");
+  // The board is followed either way; say so rather than reporting "0 jobs" for a check that failed.
+  if (failed.length) return { error: `Now following ${companyName}, but couldn't add its jobs yet: ${failed[0].error} Use "Check now" to try again.` };
   return { added, companyName };
 }
 
@@ -69,11 +71,11 @@ export async function setSourceMatching(id: string, onlyMatching: boolean): Prom
   return {};
 }
 
-export async function checkSourcesNow(): Promise<{ error?: string; checked?: number; added?: number }> {
+export async function checkSourcesNow(): Promise<{ error?: string; checked?: number; added?: number; failed?: number }> {
   const { supabase, userId } = await requireUser();
   const { data: sources } = await supabase.from("job_sources").select(SOURCE_COLUMNS);
   if (!sources?.length) return { error: "Follow a careers page first." };
-  const result = await pollSources(supabase, sources, await loadPrefs(supabase, [userId]));
+  const { checked, added, failed } = await pollSources(supabase, sources, await loadPrefs(supabase, [userId]));
   revalidatePath("/dashboard", "layout");
-  return result;
+  return { checked, added, failed: failed.length };
 }

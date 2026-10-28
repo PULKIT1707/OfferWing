@@ -64,12 +64,19 @@ type SourceRow = { id: string; user_id: string; kind: SourceKind; board_token: s
 type Prefs = { target_roles: string[]; excluded_companies: string[]; title_exclude: string[] };
 const NO_PREFS: Prefs = { target_roles: [], excluded_companies: [], title_exclude: [] };
 
-// Polls career boards, fetching each board once even when several users follow it.
-export async function pollSources(db: SupabaseClient, sources: SourceRow[], prefsByUser: Map<string, Prefs>): Promise<{ checked: number; added: number }> {
+export type PollResult = { checked: number; added: number; failed: { id: string; error: string }[] };
+
+const boardKey = (kind: SourceKind, token: string) => `${kind}:${token.toLowerCase()}`;
+
+// Polls career boards, fetching each board once even when several users follow it. `prefetched`
+// reuses a board the caller already read (following a new board reads it to learn the company name).
+export async function pollSources(db: SupabaseClient, sources: SourceRow[], prefsByUser: Map<string, Prefs>, prefetched?: { kind: SourceKind; token: string; board: Board }): Promise<PollResult> {
   const boards = new Map<string, Promise<Board>>();
+  if (prefetched) boards.set(boardKey(prefetched.kind, prefetched.token), Promise.resolve(prefetched.board));
   let added = 0;
+  const failed: PollResult["failed"] = [];
   for (const s of sources) {
-    const key = `${s.kind}:${s.board_token.toLowerCase()}`;
+    const key = boardKey(s.kind, s.board_token);
     if (!boards.has(key)) boards.set(key, fetchBoard(s.kind, s.board_token));
     const prefs = prefsByUser.get(s.user_id) ?? NO_PREFS;
     try {
@@ -92,10 +99,12 @@ export async function pollSources(db: SupabaseClient, sources: SourceRow[], pref
       added += count;
       await db.from("job_sources").update({ last_checked_at: new Date().toISOString(), last_found: count, last_error: null }).eq("id", s.id);
     } catch (err) {
-      await db.from("job_sources").update({ last_checked_at: new Date().toISOString(), last_error: (err as Error).message.slice(0, 300) }).eq("id", s.id);
+      const error = (err as Error).message.slice(0, 300);
+      failed.push({ id: s.id, error });
+      await db.from("job_sources").update({ last_checked_at: new Date().toISOString(), last_error: error }).eq("id", s.id);
     }
   }
-  return { checked: sources.length, added };
+  return { checked: sources.length, added, failed };
 }
 
 export async function loadPrefs(db: SupabaseClient, userIds: string[]): Promise<Map<string, Prefs>> {
